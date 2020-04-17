@@ -20,17 +20,15 @@
       private: yes
   tasks:
 
-# ROLE: na_ontap_config_cluster
+# ROLE: netapp.ontap collections
+#   na_ontap_config_cluster - Day1
+#   na_ontap_vserver_create - Day1
 
-  - name: Get Ontapi version
-    na_ontap_info:
-      state: info
-      <<: *login
-      ontapi: 32
-  - import_role:
-      name: na_ontap_cluster_config
-    vars:
-      <<: *login
+  roles:
+    - na_ontap_cluster_config
+    - na_ontap_vserver_create
+
+  tasks:
 
 ###
 # Standard Cluster configuration section
@@ -40,26 +38,26 @@
 
   # Standardize root volumes based on naming standards
 
-  - name: rename root volumes
-    na_ontap_volume:
-      state: present
-      from_name: "{{ item.name }}"
-      name: "{{ item.rename }}"
-      percent_snapshot_space: 0
-      vserver: "{{ item.vserver }}"
-      <<: *login
-    with_items: "{{ vol0_list }}"
+#  - name: rename root volumes
+#    na_ontap_volume:
+#      state: present
+#      from_name: "{{ item.name }}"
+#      name: "{{ item.rename }}"
+#      percent_snapshot_space: 0
+#      vserver: "{{ item.vserver }}"
+#      <<: *login
+#    with_items: "{{ vol0_list }}"
 
   # Standardize root aggergate based on naming standards
 
-  - name: rename root aggregates
-    na_ontap_aggregate:
-      state: present
-      service_state: online
-      from_name: "{{ item.name }}"
-      name: "{{ item.rename }}"
-      <<: *login
-    with_items: "{{ aggr_list }}"
+#  - name: rename root aggregates
+#    na_ontap_aggregate:
+#      state: present
+#      service_state: online
+#      from_name: "{{ item.name }}"
+#      name: "{{ item.rename }}"
+#      <<: *login
+#    with_items: "{{ aggr_list }}"
 
   # Standardize node naming based on naming standards
 
@@ -73,18 +71,6 @@
 ###
 # Standard SVM configuration section
 ###
-
-# ROLE: na_ontap_vserver_config
-
-  - name: Get Ontapi version
-    na_ontap_info:
-      state: info
-      <<: *login
-      ontapi: 32
-  - import_role:
-      name: na_ontap_vserver_create
-    vars:
-      <<: *login
 
 # non-ROLE: Update default NFS Server configuration
 
@@ -115,7 +101,6 @@
       state: "{{ state }}"
       policy_name: "{{ item.name }}"
       vserver: "{{ svm }}"
-  #    client_match: 0.0.0.0/0,1.1.1.0/24
       client_match: "{{ item.client_match }}"
       ro_rule: "{{ item.ro_rule }}"
       rw_rule: "{{ item.rw_rule }}"

@@ -40,7 +40,8 @@ dns_servers: "172.30.16.2"     # Helps remove network dependancy
 
 # NTP Server
 #ntp_srvr: time.nist.gov
-ntp_srvr: pool.ntp.org
+#ntp_srvr: pool.ntp.org
+ntp_srvr: us.pool.ntp.org
 
 # Networking Varibles
 #ifgrp_ports: "[e0e, e0f]"
@@ -48,8 +49,8 @@ ifgrp_ports: "e0e,e0f"
 vlan_id: 201
 
 # Configuring Intercluster LIFs for SnapMirror, Cloud Tier, etc.
-inters_lif1: 172.30.16.217
-inters_lif1_mask: 255.255.255.0
+inters_lif1: 172.30.16.212
+inters_lif1_mask: 255.255.0.0
 #inters_lif2: 172.30.16.213
 #inters_lif2_mask: 255.255.255.0
 
