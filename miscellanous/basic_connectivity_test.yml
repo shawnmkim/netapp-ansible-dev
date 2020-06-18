@@ -10,7 +10,7 @@
   collections:
     - netapp.ontap
   tasks:
-  - name: test
+  - name: Connectivity Test & Display ONTAP_info: All 
     na_ontap_info:
       state: info
       hostname: "{{ netapp_hostname }}"
@@ -18,3 +18,6 @@
       password: "{{ netapp_password }}"
       https: true
       validate_certs: false
+    register: ontap_info
+  - debug:
+        msg: "{{ ontap_info.ontap_info }}"
