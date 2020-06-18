@@ -1,0 +1,2 @@
+ls_mirrors:
+  - { source_volume: "svmData_root", size: 1, size_unit: gb, source_svm_name: "svmData", destination_volume: "svmData_root_LS", destination_svm_name: "svmData", destination_aggregate_name: "aggr_data1", schedule: "5min", lsupdate: "N" }

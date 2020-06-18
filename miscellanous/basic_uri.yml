@@ -7,21 +7,20 @@
       password: "{{ aiqum_password }}"
       force_basic_auth: yes
       validate_certs: false
-vars_files:
-- vars/aiqum.yml
+  vars_files:
+    - vars/aiqum.yml
 
-tasks:
-
-- name: AIQUM GET Clusters
-  uri:
-    url: "{{ api_base_url }}/datacenter/cluster/clusters"
-    method: GET
-    return_content: yes
-    headers:
+  tasks:
+  - name: AIQUM GET Clusters
+    uri:
+      url: "{{ api_base_url }}/datacenter/cluster/clusters"
+      method: GET
+      return_content: yes
+      headers:
       accept: application/json
-    <<: *login
-register: json_response
+      <<: *login
+    register: json_response
 
-- name: dump register
-  debug:
-    msg: "{{ json_response.json }}"
+  - name: dump register
+    debug:
+      msg: "{{ json_response.json }}"
