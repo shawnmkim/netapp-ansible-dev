@@ -1,7 +1,7 @@
 ---
 - hosts: localhost
   gather_facts: no
-  name: ELement Volume Config (not role-based)
+  name: Element Cluster Config
   collections:
   - netapp.elementsw
   vars:
@@ -28,25 +28,25 @@
       element_username: "{{ element_admin_username }}"
       element_password: "{{ element_admin_password }}"
       access: "{{ element_admin_access }}"
-      element_password: "{{ element_admin_password }}"
+      acceptEula: True
 
 # Manage storage - Add drives
-   - name: Add all the drives of all nodes to cluster
-     tags:
+  - name: Add all the drives of all nodes to cluster
+    tags:
      - elementsw_add_node
-     na_elementsw_drive:
-       hostname: "{{ elementsw_hostname }}"
-       username: "{{ elementsw_username }}"
-       password: "{{ elementsw_password }}"
-       state: present
-       force_during_upgrade: false
-       force_during_bin_sync: false
+    na_elementsw_drive:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      force_during_upgrade: false
+      force_during_bin_sync: false
 
 # Manage Cluster settings
   - name: Configure cluster
-      tags:
-      - elementsw_cluster_config
-      na_elementsw_cluster_config:
+    tags:
+     - elementsw_cluster_config
+    na_elementsw_cluster_config:
         hostname: "{{ elementsw_hostname }}"
         username: "{{ elementsw_username }}"
         password: "{{ elementsw_password }}"
@@ -64,9 +64,9 @@
 
   # Managing SNMP
   - name: configure SnmpNetwork
-      tags:
-      - elementsw_cluster_snmp
-      na_elementsw_cluster_snmp:
+    tags:
+    - elementsw_cluster_snmp
+    na_elementsw_cluster_snmp:
         hostname: "{{ elementsw_hostname }}"
         username: "{{ elementsw_username }}"
         password: "{{ elementsw_password }}"
