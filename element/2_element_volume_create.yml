@@ -1,7 +1,7 @@
 ---
 - hosts: localhost
   gather_facts: no
-  name: ELement Volume Config (not role-based)
+  name: ELement Volume Config
   vars:
      login: &login
        hostname: "{{ elementsw_hostname }}"
@@ -21,7 +21,7 @@
 
 # Create Volume Account
 
-  - name: Create Account
+  - name: Create a Volume Account
     na_elementsw_account:
       <<: *login
       state: "{{ state }}"
