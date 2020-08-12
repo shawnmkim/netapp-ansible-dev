@@ -3,10 +3,18 @@
 
 elementsw_hostname: 172.30.16.220
 elementsw_username: admin
-#elementsw_password:
+#elementsw_password:  # Using vars_prompt
 
 state: present
 
+# Cluster Configuration
+element_admin_username: ken
+element_admin_username: netapp1234
+element_admin_access: admin
+
+
+
+# Cluster Configuration
 vol_element_username: Ansible
 vol_element_username_id: 1
 
