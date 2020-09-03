@@ -3,7 +3,7 @@
 
 elementsw_hostname: 192.168.7.220
 elementsw_username: admin
-#elementsw_password:  # Using vars_prompt
+elementsw_password:  netapp1234 # Using vars_prompt
 
 state: present
 
@@ -12,14 +12,19 @@ element_admin_username: ken
 element_admin_password: netapp1234
 element_admin_access: clusterAdmins
 #element_admin_access: clusterAdmins,reporting,volumes,accounts,drives,nodes
-
+element_admin_list:
+  - {}
 
 # Cluster Configuration
 vol_element_username: Ansible
-vol_element_username_id: 1
+vol_element_username_id: 5
 
 vol_name: AnsibleVol
-vol_qos: '{minIOPS: 1000, maxIOPS: 20000, burstIOPS: 50000}'
+# vol_qos: '{minIOPS: 1000, maxIOPS: 20000, burstIOPS: 50000}'
+vol_qos:
+  minIOPS: 1000
+  maxIOPS: 20000
+  burstIOPS: 50000
 vol_account_id: Ansible
 vol_enable512e: False
 vol_size: 2

@@ -1,0 +1,29 @@
+- name: Add admin user
+      na_elementsw_admin_users:
+        state: present
+        username: "{{ admin_user_name }}"
+        password: "{{ admin_password }}"
+        hostname: "{{ hostname }}"
+        element_username: carchi8py
+        element_password: carchi8py
+        acceptEula: True
+        access: accounts,drives
+
+    - name: modify admin user
+      na_elementsw_admin_users:
+        state: present
+        username: "{{ admin_user_name }}"
+        password: "{{ admin_password }}"
+        hostname: "{{ hostname }}"
+        element_username: carchi8py
+        element_password: carchi8py12
+        acceptEula: True
+        access: accounts,drives,nodes
+
+    - name: delete admin user
+      na_elementsw_admin_users:
+        state: absent
+        username: "{{ admin_user_name }}"
+        password: "{{ admin_password }}"
+        hostname: "{{ hostname }}"
+        element_username: carchi8py

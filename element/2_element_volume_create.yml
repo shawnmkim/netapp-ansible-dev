@@ -1,7 +1,7 @@
 ---
 - hosts: localhost
   gather_facts: no
-  name: ELement Volume Config
+  name: Element Volume Config
   vars:
      login: &login
        hostname: "{{ elementsw_hostname }}"
@@ -11,10 +11,10 @@
 #       validate_certs: false
   vars_files:
     - element_vars.yml
-  vars_prompt:
-    - name: "elementsw_password"
-      prompt: "Enter Element Admin Password"
-      private: yes
+  # vars_prompt:
+  #   - name: "elementsw_password"
+  #     prompt: "Enter Element Admin Password"
+  #     private: yes
   tasks:
 
 # Element Volume Configuration

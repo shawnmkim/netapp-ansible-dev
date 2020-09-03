@@ -1,0 +1,26 @@
+
+    ########## Run iscsiadm commands in the compute instance to attach and connect to the block storage volme ##########
+    - name: Register the volume in the instance with iscsiadm
+      # iscsiadm -m node -o new -T <volume IQN> -p <iSCSI IP address>:<iSCSI port>
+      command: "ssh {{ common_ssh_args }} sudo iscsiadm -m node -o new -T {{ volume_attachment_details.iqn }} -p {{ volume_attachment_details.ipv4 }}:{{ volume_attachment_details.port }}"
+      register: result
+
+    - name: Configure iSCSI to automatically connect to the authenticated block storage volumes after a reboot
+      # iscsiadm -m node -T <volume IQN> -o update -n node.startup -v automatic
+      command: "ssh {{ common_ssh_args }} sudo iscsiadm -m node -T {{ volume_attachment_details.iqn }} -o update -n node.startup -v automatic"
+
+    - name: Login to the iSCSI endpoint
+      # iscsiadm -m node -T <volume IQN> -p <iSCSI IP address>:<iSCSI port> -l
+      # The volume attachment in this sample doesn't have CHAP details configured. If CHAP was enabled,
+      # authenticate the iSCSI connection with the volume's CHAP credentials in this task.
+      command: "ssh {{ common_ssh_args }} sudo iscsiadm -m node -T {{ volume_attachment_details.iqn }} -p {{ volume_attachment_details.ipv4 }}:{{ volume_attachment_details.port }}  -l"
+
+    - name: Check if the iSCSI device is mountable on the instance
+      command: "ssh {{ common_ssh_args }} sudo fdisk -l"
+      register: result
+    - debug: msg="{{result.stdout}}"
+    - assert:
+        that:
+          - "'Disk /dev/sdb' in result.stdout"
+        fail_msg: "'Disk /dev/sdb' not returned in fdisk output. The block storage volume was not attached."
+        success_msg: "'Disk /dev/sdb' returned in fdisk output. The block storage volume attached."
