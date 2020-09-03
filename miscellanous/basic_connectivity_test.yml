@@ -1,6 +1,7 @@
 ---
 - hosts: localhost
   gather_facts: false
+  name: Basic Connectivity Test
   vars_files:
     - test_vars.yml
   vars_prompt:
@@ -10,7 +11,7 @@
   collections:
     - netapp.ontap
   tasks:
-  - name: Connectivity Test & Display ONTAP_info: All 
+  - name: Connectivity Test & Display ONTAP_info: All
     na_ontap_info:
       state: info
       hostname: "{{ netapp_hostname }}"
