@@ -1,0 +1,85 @@
+---
+- hosts: localhost
+  gather_facts: no
+  name: Element Cluster Config
+  collections:
+  - netapp.elementsw
+  vars:
+     login: &login
+       hostname: "{{ elementsw_hostname }}"
+       username: "{{ elementsw_username }}"
+       password: "{{ elementsw_password }}"
+  vars_files:
+    - element_vars.yml
+  vars_prompt:
+    - name: "elementsw_password"
+      prompt: "Enter Element Admin Password"
+      private: yes
+  tasks:
+
+# Element Cluster Configuration
+
+# Create Volume Account
+
+  - name: Create Admin Account
+    na_elementsw_admin_users:
+      <<: *login
+      state: "{{ state }}"
+      element_username: "{{ element_admin_username }}"
+      element_password: "{{ element_admin_password }}"
+      access: "{{ element_admin_access }}"
+      acceptEula: True
+
+# Manage storage - Add drives
+  - name: Add all the drives of all nodes to cluster
+    tags:
+     - elementsw_add_node
+    na_elementsw_drive:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      force_during_upgrade: false
+      force_during_bin_sync: false
+
+# Manage Cluster settings
+  - name: Configure cluster
+    tags:
+     - elementsw_cluster_config
+    na_elementsw_cluster_config:
+        hostname: "{{ elementsw_hostname }}"
+        username: "{{ elementsw_username }}"
+        password: "{{ elementsw_password }}"
+        modify_cluster_full_threshold:
+          stage2_aware_threshold: 2
+          stage3_block_threshold_percent: 10
+          max_metadata_over_provision_factor: 2
+        encryption_at_rest: absent
+        set_ntp_info:
+          broadcastclient: False
+          ntp_servers:
+          - 216.239.35.0  # time.google.com
+          - 216.239.35.4  # time2.google.com
+        enable_virtual_volumes: False
+
+  # Managing SNMP
+  - name: configure SnmpNetwork
+    tags:
+    - elementsw_cluster_snmp
+    na_elementsw_cluster_snmp:
+        hostname: "{{ elementsw_hostname }}"
+        username: "{{ elementsw_username }}"
+        password: "{{ elementsw_password }}"
+        state: present
+        snmp_v3_enabled: True
+        usm_users:
+          access: rouser
+          name: snmpuser
+          password: T3mp-p@55
+          passphrase: T3mp-p@55
+          secLevel: auth
+        networks:
+          access: ro
+          cidr: 24
+          community: lab.example.local
+          network: 192.168.7.1

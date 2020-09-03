@@ -1,12 +1,20 @@
 # Ansible Varible file for
 # Element Volume provisioning workflow to a Linux Client
 
-elementsw_hostname: 172.30.16.220
+elementsw_hostname: 192.168.7.220
 elementsw_username: admin
-#elementsw_password:
+#elementsw_password:  # Using vars_prompt
 
 state: present
 
+# Cluster Configuration
+element_admin_username: ken
+element_admin_password: netapp1234
+element_admin_access: clusterAdmins
+#element_admin_access: clusterAdmins,reporting,volumes,accounts,drives,nodes
+
+
+# Cluster Configuration
 vol_element_username: Ansible
 vol_element_username_id: 1
 
