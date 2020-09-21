@@ -1,6 +1,6 @@
 ---
 # tasks file for ls_mirror
-- name: ..... create destination LS Volume "{{ item.ls_destination_volume }}"
+- name: ..... Create destination LS Volume "{{ item.ls_destination_volume }}"
   na_ontap_volume:
     hostname: "{{ netapp_hostname }}"
     username: "{{ netapp_username }}"
@@ -17,8 +17,8 @@
     is_infinite: False
   with_items:
     "{{ ls_mirrors }}"
-    
-- name: ..... create LS Mirror
+
+- name: ..... Create LS Mirror Relationship
   na_ontap_snapmirror:
     hostname: "{{ netapp_hostname }}"
     username: "{{ netapp_username }}"
