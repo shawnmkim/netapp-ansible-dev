@@ -1,0 +1,53 @@
+---
+# Basic Provisioning details
+vserver:                "source"              # Primary SVM
+peer_vserver:           "destination"         # Secondary SVM
+service_level_name:     "Value"               # Storage Performance Service Level
+vol_name:               "aiqum_test_nfs_03"   # Volume name
+size:                   1                     # In GB
+convert:               "{{ size * 1073741824 }}"  # volume size * 1 GB = 1073741824 B
+capacity:               "{{ convert }}"         # volume size in bytes 1 GB = 1073741824 B
+auto_size:              grow_shrink           # off, grow, or grow_shrink
+
+# Credential Section
+netapp_username:        "{{ netapp_username }}"  # NetApp Adminstrative credentials
+netapp_password:        "{{ netapp_password }}"  # NetApp Adminstrative credentials
+admin_username:         "{{ netapp_username }}"  # NetApp Adminstrative credentials
+admin_password:         "{{ netapp_password }}"  # NetApp Adminstrative credentials
+dst_admin_username:     "{{ netapp_username }}"  # NetApp Adminstrative credentials
+dst_admin_password:     "{{ netapp_password }}"  # NetApp Adminstrative credentials
+
+# AIQUM
+aiqum_username:         "{{ netapp_username }}"  # NetApp Adminstrative credentials
+aiqum_password:         "{{ netapp_password }}"  # NetApp Adminstrative credentials
+aiqum_endpoint_url:     https://192.168.7.225/api  # NetApp AIQUM API endpoint
+
+
+# NAS Section
+nas_protocol:           "nfs"                  # CIFS, NFS, and Multi-protocol
+#vol_security_style:     "unix"                 # Volume security-style
+vol_security_style:     "{{ 'ntfs' if nas_protocol == 'cifs' else 'unix' }}"                 # Volume security-style
+
+# SnapMirror Section
+data_protection:        true                   # DR replica: True/False
+peer_aggregate:         "{{ dest_aggr }}"        # DR replica - aggregate (becuase aiqum don't support DP volumes)
+cluster_ip:             "{{ netapp_hostname }}"        # ONTAP cluster-mgmt
+peer_cluster_ip:        "{{ dest_netapp_hostname }}"        # ONTAP cluster-mgmt
+policy_name:            "{{ vol_name }}"       # Setting policy_name to vol_name
+policy_rules:                                  # export-policy rule entries
+   -  client_match:           192.168.7.122
+      protocol:               nfs
+      ro_rule:                any
+      rw_rule:                sys
+      super_user_security:    any
+   -  client_match:           192.168.7.0/24
+      protocol:               nfs
+      ro_rule:                any
+      rw_rule:                sys
+      super_user_security:    none
+
+# Basic ACL config
+RO:
+-  EXAMPLE\Administrator
+RW:
+-  EXAMPLE\Administrator

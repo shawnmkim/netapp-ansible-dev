@@ -1,0 +1,60 @@
+---
+# tasks file for ls_mirror
+- name: ..... create destination LS Volume "{{ item.ls_destination_volume }}"
+  na_ontap_volume:
+    hostname: "{{ netapp_hostname }}"
+    username: "{{ netapp_username }}"
+    password: "{{ netapp_password }}"
+    https: true
+    validate_certs: false
+    state: present
+    name: "{{ item.ls_destination_volume }}"
+    aggregate_name: "{{ item.destination_aggregate }}"
+    size: "{{ (lookup('template', 'convert2bytes.j2') | int * 1.05) | round(0, 'ceil') | int }}"
+    size_unit: b
+    type: DP
+    vserver: "{{ item.destination_svm }}"
+    is_infinite: False
+  with_items:
+    "{{ ls_mirrors }}"
+    
+- name: ..... create LS Mirror
+  na_ontap_snapmirror:
+    hostname: "{{ netapp_hostname }}"
+    username: "{{ netapp_username }}"
+    password: "{{ netapp_password }}"
+    https: true
+    validate_certs: false
+    state: present
+    source_volume: "{{ item.ls_source_volume }}"
+    source_vserver: "{{ item.source_svm }}"
+    destination_volume: "{{ item.ls_destination_volume }}"
+    destination_vserver: "{{ item.destination_svm }}"
+    relationship_type: load_sharing
+    schedule: "{{ item.schedule }}"
+  with_items:
+    "{{ ls_mirrors }}"
+
+- name: ..... initialize LS mirrors
+  na_ontap_command:
+    hostname: "{{ netapp_hostname }}"
+    username: "{{ netapp_username }}"
+    password: "{{ netapp_password }}"
+    https: true
+    validate_certs: false
+    command: ['snapmirror', 'initialize', '-source-path', '{{ cluster }}://{{ item.source_svm }}/{{ item.ls_source_volume }}', '-destination-path', '{{ cluster }}://{{ item.destination_svm }}/{{ item.ls_destination_volume }}' ]
+  with_items:
+    "{{ ls_mirrors }}"
+  when: item.lsupdate == "Y"
+
+- name: ..... execute LS updates
+  na_ontap_command:
+    hostname: "{{ netapp_hostname }}"
+    username: "{{ netapp_username }}"
+    password: "{{ netapp_password }}"
+    https: true
+    validate_certs: false
+    command: ['snapmirror', 'update-ls-set', '-source-path', '{{ cluster }}://{{ item.source_svm }}/{{ item.ls_source_volume }}' ]
+  with_items:
+    "{{ ls_mirrors }}"
+  when: item.lsupdate == "Y"

@@ -1,0 +1,32 @@
+
+# Cluster and SVM Peering paramters
+passphrase: seespotrun
+
+# destination cluster
+dest_cluster: dest97
+dest_netapp_hostname: 192.168.7.195
+dest_intercluster_lif: 192.168.7.197
+peer_vserver: destination
+peer_cluster: "{{ dest_cluster }}"
+
+
+
+# source cluster
+source_cluster: sour97
+source_netapp_hostname: 192.168.7.190
+source_intercluster_lif: 192.168.7.192
+
+
+# Snapmirror volume test parameters
+svm: source
+dest_svm: destination
+volname: "{{ dest_volname }}"
+dest_volname: snap01
+dest_aggr: "dest97_01_aggr1"
+dest_vol_size: 1
+dest_vol_size_units: gb
+
+vol_sm_type: dp
+vol_type: dp
+sm_policy: MirrorAllSnapshots
+sm_type: extended_data_protection
