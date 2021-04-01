@@ -31,13 +31,13 @@
       state: present
       service_state: online
       from_name: "{{ item.1 }}"   # Sets the from_name to the current aggr being evaluated
-      name: "{{ 'a0_' + (item.0 | regex_search('.(2)$')) }}"  # Based on the 'when' checks below if will set the new aggr name varible
+      name: "{{ 'a0_' + (item.0 | regex_search('.(2)$')) }}"  # Based on the 'when' checks below if will set the new aggr name varible to a0_<last two digits of the node name>
     register: result
     with_nested:
     - "{{ netapp.na_ontap_info.cluster_node_info }}"  # First loop to go through each node
     - "{{ netapp.na_ontap_info.aggregate_info }}"   # Second loop to check aggrs based on current node in first loop
     when:
-    - netapp.ontap_info.aggregate_info[item.1].aggr_ownership_attributes.owner_name == item.0   # Check to see ifthe owner name
-    - netapp.ontap_info.aggregate_info[item.1].aggr_raid_attributes.is_root_aggregate == 'true'   # Check to see if the current aggregate is the root aggregate
-    - item.1 != 'a0_' + (item.0 | regex_search('.(2)$'))  # Check to see if the current aggr name is not a0_<last two digits of the
+    - netapp.ontap_info.aggregate_info[item.1].aggr_ownership_attributes.owner_name == item.0   # Check to see ifthe owner name of the current aggr matches the current node name
+    - netapp.ontap_info.aggregate_info[item.1].aggr_raid_attributes.is_root_aggregate == 'true'   # Check to see if the current aggregate is a root aggregate
+    - item.1 != 'a0_' + (item.0 | regex_search('.(2)$'))  # Check to see if the current aggr name is not a0_<last two digits of the node name>
   #-----------------------------------------------------------------------------
