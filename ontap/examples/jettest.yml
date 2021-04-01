@@ -1,0 +1,43 @@
+---
+- hosts: localhosts
+  connection: local
+  gather_facts: false
+  name: Ansible NetApp Automated Build
+
+  #-----------------------------------------------------------------------------
+  # varible naming uses the following prefixes:
+  #   f_ from vars_files
+  #   s_ from survey in tower
+  vars_files:
+  - vars/cdotab_vars.yaml
+  vars:
+    login: &login
+      hostname: "{{ s_cluster_name }}"
+      username: "{{ s_username }}"
+      password: "{{ s_password }}"
+      https: true
+      validate_certs: false
+  #-----------------------------------------------------------------------------
+  tasks:
+  - name: NetApp ONTAP Info
+    na_ontap_info:
+      <<: *login    # Calls login alias set above
+      state: info
+    register: netapp
+  #-----------------------------------------------------------------------------
+  - name: Rename node root aggrs
+    na_ontap_aggregate:
+      <<: *login    # Calls login alias set above
+      state: present
+      service_state: online
+      from_name: "{{ item.1 }}"   # Sets the from_name to the current aggr being evaluated
+      name: "{{ 'a0_' + (item.0 | regex_search('.(2)$')) }}"  # Based on the 'when' checks below if will set the new aggr name varible
+    register: result
+    with_nested:
+    - "{{ netapp.na_ontap_info.cluster_node_info }}"  # First loop to go through each node
+    - "{{ netapp.na_ontap_info.aggregate_info }}"   # Second loop to check aggrs based on current node in first loop
+    when:
+    - netapp.ontap_info.aggregate_info[item.1].aggr_ownership_attributes.owner_name == item.0   # Check to see ifthe owner name
+    - netapp.ontap_info.aggregate_info[item.1].aggr_raid_attributes.is_root_aggregate == 'true'   # Check to see if the current aggregate is the root aggregate
+    - item.1 != 'a0_' + (item.0 | regex_search('.(2)$'))  # Check to see if the current aggr name is not a0_<last two digits of the
+  #-----------------------------------------------------------------------------
