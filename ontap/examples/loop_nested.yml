@@ -1,0 +1,7 @@
+# Here is the loop way of doing nested loops
+"{{ netapp.ontap_info.cluster_node_info|product(broadcast_domains)|list }}" | product(<second list>) | list
+
+# subelements: When the second list is a list within the first list.
+# for each vservers' entry, it will loop through the lifs' list ('subelements('lifs')')
+# which is part of the vserver entry and its sub-elements.
+"{{ vservers|subelements('lifs') }}"

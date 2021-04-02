@@ -1,0 +1,152 @@
+# Varibles for ONTAP cluster setup & config
+cluster: ontap-cl01
+cluster_loc: VSIM           # 'system snmp location'
+cluster_mgmt: 192.168.7.180
+cluster_netmask: 255.255.255.0
+cluster_gateway: 192.168.7.1
+cluster_aggr: "{{ cluster | replace('-','_') }}"  # Replaces - with _
+
+# Node & SVM Network IP address Information
+node1:
+  node_mgmt_ip: 192.168.7.181
+  # icl:
+  svm_lif1: 192.168.7.185
+node2:
+  node_mgmt_ip: 192.168.7.183
+  # icl:
+  svm_lif1: 192.168.7.186
+
+# Authentification Defaults
+netapp_hostname:  "{{ cluster_mgmt }}"
+netapp_username: admin
+netapp_password: netapp1234     # Comment out to use vars_prompt
+validate_certs: false           # Set the default
+
+# DNS Services Settings
+dns_domain: example.local
+dns_srvrs: 192.168.7.3
+
+# NTP & Timezone Settings
+time: time.nist.gov
+tzone: 'US/Pacific'           #  <Area/Location Timezone> - Specified in the Olson format
+# tzone: 'ETC/GMT'           #  <Area/Location Timezone> - Specified in the Olson format
+
+# Autosupport Configuration Varibles
+asup_proxy_url:
+asup_transport: smtp
+asup_noteto: admin@example.local
+asup_mailhosts: 192.168.7.3
+asup_hostsubj: true
+asup_to: netapp_admin@example.local
+asup_from: '{{ cluster }}@example.local'
+asup_partner:
+
+asup_config:  # Autosupport configuration list
+  - { node: '{{ cluster }}-01', proxy_url: '{{ asup_proxy_url }}', transport: '{{ asup_transport }}', hostsubj: '{{ asup_hostsubj }}', from: '{{ asup_from }}', noteto: '{{ asup_noteto }}', to: '{{ asup_to }}', partner: '{{ asup_partner }}', mailhosts: '{{ asup_mailhosts }}'  }
+  - { node: '{{ cluster }}-02', proxy_url: '{{ asup_proxy_url }}', transport: '{{ asup_transport }}', hostsubj: '{{ asup_hostsubj }}', from: '{{ asup_from }}', noteto: '{{ asup_noteto }}', to: '{{ asup_to }}', partner: '{{ asup_partner }}', mailhosts: '{{ asup_mailhosts }}'  }
+
+# SVM Configuration Settings
+svm: ontap-vs01
+svm_root: "{{ svm | replace('-','_') }}"
+svm_netmask: "{{ cluster_netmask }}"    # Replace with IP if not the same
+svm_gateway: "{{ cluster_gateway }}"    # Replace with IP if not the same
+
+# Broadcast Domain name varibles
+bd:
+  mgmt: mgmt
+  nas: data
+
+# Broadcast-domain split: Active Management ports
+bcd_split_ports:
+  - { origin_bd: Default, new_bd: "{{ bd.mgmt }}", ports: '["{{ cluster }}-01:e0M", "{{ cluster }}-02:e0M"]' }
+
+# Networking Varibles - Update port members for 'ifgrp' config below
+ifgrp_ports: "e0d,e3a"
+vlan_id: 42   # Replace with VLAN ID
+
+###
+# Role-Based: Standard Config
+###
+
+###
+# Cluster Config
+###
+
+license_codes: QDDSVRRRYVHXCFABGAAAAAAAAAAA,MBXNQRRRYVHXCFABGAAAAAAAAAAA,ANGJKUNFXMSMUCEZFAAAAAAAAAAA,UFTUNUNFXMSMUCEZFAAAAAAAAAAA
+
+disks:  # disks module assigns all visible disks to a node.
+  - "{{ cluster }}-01"
+  - "{{ cluster }}-02"
+
+dns:    # Set DNS for Cluster
+  - { dns_domains: "{{ dns_domain }}", dns_nameservers: "{{ dns_srvrs }}" }
+
+ntp:    # Set NTP Server (requires the cluster to have DNS set)
+  - { server_name: "{{ time }}", version: auto }
+
+aggrs:  # Create one or more Aggregates.
+  - { name: "{{ cluster_aggr }}_01_aggr1", node: "{{ cluster }}-01", disk_count: 40, max_raid: 20 }
+  - { name: "{{ cluster_aggr }}_02_aggr1", node: "{{ cluster }}-02", disk_count: 40, max_raid: 20 }
+
+ports:  # Set MTU for ports
+  - { node: "{{ cluster }}-01", port: e0d, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-01", port: e0e, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-01", port: e3a, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-01", port: e3b, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-02", port: e0d, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-02", port: e0e, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-02", port: e3a, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-02", port: e3b, mtu: 1500, flowcontrol: none }
+
+ifgrps:  # Create and add ports to Interface Groups.
+  - { name: a0a, node: "{{ cluster }}-01", ports: "{{ ifgrp_ports }}", mode: multimode_lacp, mtu: 9000 }
+  - { name: a0a, node: "{{ cluster }}-02", ports: "{{ ifgrp_ports }}", mode: multimode_lacp, mtu: 9000 }
+
+vlans:  # Create vlans on LIFS
+  # - { id: "{{ vlan_id }}", node: "{{ cluster }}-01", parent: a0a }
+  # - { id: "{{ vlan_id }}", node: "{{ cluster }}-02", parent: a0a }
+
+bcasts:  # Create Broadcast domains
+  - { name: "{{ bd.nas }}", mtu: 1500, ipspace: default,
+      ports: "{{ cluster }}-01:a0a,{{ cluster }}-02:a0a" }
+  - { name: "{{ bd.mgmt }}", mtu: 1500, ipspace: default,
+      ports: '{{ cluster }}-01:e0M,{{ cluster }}-02:e0M,{{ cluster }}-01:e0e,{{ cluster }}-02:e0e' }
+
+inters: # Create intercluster lifs for SnapMirror.
+  # - { name: "{{ cluster }}-01_icl1", address: "{{ node1.icl }}", netmask: "{{ svm_netmask }}", node: "{{ cluster }}-01", port: e0d }
+  # - { name: "{{ cluster }}-01_icl2", address: "{{ node2.icl }}", netmask: "{{ svm_netmask }}", node: "{{ cluster }}-02", port: e0d }
+
+
+###
+# Vserver Config
+###
+
+vservers:  # Vservers to create # aggr_list is optional.  If not specified, defaults to all aggregates.
+  - { name: "{{ svm }}", aggr: "{{ cluster_aggr }}_01_aggr1", protocol: nfs, rootvol: "{{ svm_root }}", aggr_list: "{{ cluster_aggr }}_01_aggr1,{{ cluster_aggr }}_02_aggr1" }
+
+vserver_dns:  # DNS at the Vserver level
+  - { vserver: "{{ svm }}", dns_domains: "{{ dns_domain }}", dns_nameservers: "{{ dns_srvrs }}" }
+
+lifs:  # interfaces for the Vservers being created
+  - { name: "{{ svm }}_data1", vserver: "{{ svm }}", node: "{{ cluster }}-01", port: a0a, protocol: nfs, address: "{{ node1.svm_lif1 }}", netmask: "{{ svm_netmask }}" }
+  - { name: "{{ svm }}_data2", vserver: "{{ svm }}", node: "{{ cluster }}-02", port: a0a, protocol: nfs, address: "{{ node1.svm_lif2 }}", netmask: "{{ svm_netmask }}" }
+
+gateway:  # To configure the default route/gateway for the vservers
+  - { vserver: "{{ svm }}", destination: 0.0.0.0/0, gateway: "{{ svm_gateway }}" }
+
+###
+# Non-Role-Based: Standard Config
+###
+
+###
+# Export-Policy Management
+# Note: Replace networks that are valid to the environment & adjust as needed
+###
+
+svm_export_policy_name:
+  - { svm: "{{ svm }}", name: 'Data' }
+
+export_policy_rules_list:
+  - { name: 'default', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: any, ro_rule: 'any', rw_rule: 'none', super_user_security: 'none' }
+  - { name: 'Data', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: nfs, ro_rule: 'any', rw_rule: 'any', super_user_security: 'sys' }
+  - { name: 'Data', svm: "{{ svm }}", client_match: '0.0.0.0/0', protocol: nfs, ro_rule: 'any', rw_rule: 'none', super_user_security: 'none' }
