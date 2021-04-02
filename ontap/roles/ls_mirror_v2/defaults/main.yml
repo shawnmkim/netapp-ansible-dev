@@ -1,0 +1,4 @@
+---
+# defaults file for ls_mirror
+ls_mirrors:
+    - { ls_source_volume: "svmData_root", size: 1, size_unit: gb, source_svm: "svmData", ls_destination_volume: "svmData_root_LS", destination_svm: "svmData", destination_aggregate: "aggr_data1", schedule: "5min", lsupdate: "N" }
