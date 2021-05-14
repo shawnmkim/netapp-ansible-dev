@@ -1,0 +1,59 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+   elementsw_hostname: "192.168.7.220"  #IP / Hostname of the SolidFire Storage
+   elementsw_username: "admin"        #Storage Username
+   elementsw_password: "netapp1234"       #Storage Password
+   appname: ""             #Name of host to mount to - use extra vars to pass in
+   serveriqn: "" #IQN of the host to mount to - use extra vars to pass in
+   created_vol_ids: []                  #Leave this empty
+  tasks:
+
+#Current NetApp module does not allow QoS policy assignement so we are using REST API call. This will be fixed in an upcoming module release
+#Create 4x Indexer volumes, these will be striped to create a single mount point within the VM OS
+  - name: Create Indexer Volumes
+    uri:
+      url: https://{{elementsw_hostname}}/json-rpc/11.3
+      user: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      method: POST
+      validate_certs: false
+      headers:
+        connection: keep-alive
+      body:
+        method: CreateVolume
+        params:
+          name: "{{ appname }}-indexer-{{ item }}"
+          accountID: 1
+          totalSize: 13194139531
+          enable512e: false
+          qosPolicyID: 1
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+    # loop: "{{ [1, 2, 3, 4] }}"
+    loop: "{{ [1] }}"
+    register: created_vols
+
+  - name: Getting Indexer Volume IDs
+    set_fact:
+      created_vol_ids: "{{ created_vol_ids }} + [ '{{ item.json.result.volumeID }}' ]"
+    loop: "{{ created_vols.results }}"
+    loop_control:
+      label: "{{ item.json.result.volume.name }}"
+
+  - name: Check All Volume IDs
+    debug: msg="{{ created_vol_ids }}"
+
+# Create a Volume Access Group for all volumes and the host initiator
+  - name: Create Access Group
+    na_elementsw_access_group:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      name: "{{ appname }}"
+      volumes: "{{ created_vol_ids }}"
+      initiators: "{{ serveriqn }}"
+      account_id: "1"

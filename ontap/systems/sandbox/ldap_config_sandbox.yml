@@ -1,0 +1,28 @@
+---
+- hosts: localhost
+  name: 'Cluster Config: {{ cluster }}'
+  gather_facts: no
+  vars:
+    state: present
+    login: &login
+      hostname: "{{ netapp_hostname }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: "{{ validate_certs }}"
+
+  vars_files:
+  - vars/vars_cluster_config_sandbox.yml
+  collections:
+  - netapp.ontap
+
+  tasks:
+
+
+  ###
+  # Role: LDAP Configuration
+  # Note: Added LDAP Config role
+  ###
+
+  - include_role:
+      name: na_ontap_ldap_config

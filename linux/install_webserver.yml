@@ -1,0 +1,60 @@
+---
+- hosts: all
+  user: ken
+  become: yes
+  tasks:
+      - name: Install httpd
+        dnf:
+            name: httpd
+            state: latest
+        when: ansible_os_family == "RedHat"
+      - name: Install apache2
+        apt:
+            name: apache2
+            state: latest
+        when: ansible_os_family == "debian"
+      - name: Make sure httpd service is running
+        service:
+            name: httpd
+            state: started
+            enabled: True
+        when: ansible_os_family == "redhat"
+      - name: Make sure apache2 service is running
+        service:
+            name: apache2
+            state: started
+            enabled: True
+        when: ansible_os_family == "debian"
+
+      - name: Copy index.html file to RedHat server
+        copy:
+            src: var/index.html
+            dest: /var/www/html/
+            mode: 0644
+            owner: apache
+            group: apache
+        when: ansible_os_family == "redhat"
+      - name: Copy index.html file to Debain server
+        copy:
+            src: var/index.html
+            dest: /var/www/html/
+            mode: 0644
+            owner: www-data
+            group: www-data
+        when: ansible_os_family == "debian"
+
+      - name: Check status of httpd
+        service_facts:
+        register: service_state
+        when: ansible_os_family == "redhat"
+      - debug:
+          var: service_state.ansible_facts.services["httpd"].state
+
+      - name: Check status of apache2
+        service_facts:
+        register: service_state
+        when: ansible_os_family == "debian"
+      - debug:
+          var: service_state.ansible_facts.services["apache2"].state
+
+      

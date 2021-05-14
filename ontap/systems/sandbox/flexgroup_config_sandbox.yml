@@ -1,0 +1,92 @@
+---
+- hosts: localhost
+  name: 'SNMP Config: {{ cluster }}'
+  gather_facts: no
+  vars:
+    state: present
+    login: &login
+      hostname: "{{ netapp_hostname }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: "{{ validate_certs }}"
+
+  vars_files:
+  - vars/vars_flexgroup_config_sandbox.yml
+  collections:
+  - netapp.ontap
+
+  tasks:
+
+  ###
+  # Module-Based: Flexgroup Volume Configuration
+  ###
+
+  ###
+  # Flexgroup Volume Create
+  # Note: Minimum size is "1.56TB" ("1717986918400B").
+  ###
+
+
+  # - name: Create Flexgroup volume manually
+  #   na_ontap_volume:
+  #     state: present
+  #     <<: *login
+  #
+  #     name: "{{ volname }}"
+  #     is_infinite: False
+  #     aggr_list: "{{ aggr_list }}"
+  #     aggr_list_multiplier: 2
+  #     size: 200
+  #     size_unit: mb
+  #     space_guarantee: none
+  #     export_policy: default
+  #     vserver: "{{ svm }}"
+  #     qos_adaptive_policy_group: performance
+  #     https: False
+  #     unix_permissions: 777
+  #     snapshot_policy: default
+  #     time_out: 0
+
+  - name: Create Flexgroup volume auto provsion as flex group
+    na_ontap_volume:
+      state: present
+      <<: *login
+
+      name: "{{ volname }}"
+      is_infinite: False
+      auto_provision_as: flexgroup
+      size: 2
+      size_unit: tb
+      space_guarantee: none
+      export_policy: default
+      vserver: "{{ svm }}"
+      qos_adaptive_policy_group: value
+      unix_permissions: '777'
+      snapshot_policy: default
+      time_out: 0
+
+  # - name: Volume create using application/applications nas template
+  #   na_ontap_volume:
+  #     state: present
+  #     name: ansibleVolume12
+  #     vserver: ansibleSVM
+  #     size: 100000000
+  #     size_unit: b
+  #     space_guarantee: none
+  #     language: es
+  #     percent_snapshot_space: 60
+  #     unix_permissions: ---rwxrwxrwx
+  #     snapshot_policy: default
+  #     efficiency_policy: default
+  #     comment: testing
+  #     nas_application_template:
+  #       nfs_access:   # the mere presence of a suboption is enough to enable this new feature
+  #         - access: ro
+  #         - access: rw
+  #           host: 10.0.0.0/8
+  #     hostname: "{{ netapp_hostname }}"
+  #     username: "{{ netapp_username }}"
+  #     password: "{{ netapp_password }}"
+  #     https: true
+  #     validate_certs: false

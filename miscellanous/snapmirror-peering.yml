@@ -1,0 +1,19 @@
+---
+- hosts: localhost
+  name: Snapmirror Create
+  gather_facts: false
+  vars:
+    src_ontap: 172.32.0.182
+    src_name: vsim
+    src_lif: 172.32.0.187
+    src_vserver: Marketing
+    src_volume: Marketing_Presentation
+    dst_ontap: 172.32.0.192
+    dst_name: cvo
+    dst_lif: 172.32.0.194
+    dst_aggr: aggr1
+    dst_vserver: backup_vserver
+    username: admin
+    password: netapp123
+  roles:
+    - na_ontap_snapmirror_create

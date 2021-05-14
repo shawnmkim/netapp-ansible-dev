@@ -1,0 +1,85 @@
+# Varibles for ONTAP setup & config
+cluster: sandbox
+cluster_aggr: "{{ cluster | replace('-','_') }}"  # For use with vserver role, Remove '-'s and replace with '_'s
+cluster_mgmt: 192.168.7.200
+node1:
+  node_mgmt_ip: 192.168.7.201
+  icl: 192.168.7.202
+  vs0: 192.168.7.205
+node2:
+  node_mgmt_ip: 192.168.7.203
+  icl: 192.168.7.204
+  vs0: 192.168.7.206
+
+# Authentification Defaults
+netapp_hostname: "{{ cluster_mgmt }}"
+netapp_username: admin
+netapp_password: netapp1234     # Comment out to use vars_prompt
+netapp_https: true
+netapp_validate_certs: false           # Set the default
+
+# SVM configuration
+svm: ontap-vs01
+
+###
+# Module-Based:  Volume Configuration varibles
+###
+
+# Volume Configuration Templates
+
+vol_type:
+  scratch:
+    :max_size: 15TB
+    :size: 8TB
+    :snap_policy: csg_scratch
+    :qos_policy: csg_scratch
+    :snap_percent: 5
+    :export_policy: CSG_Default_0001
+
+  scratch_ns:
+    :max_size: 15TB
+    :size: 8TB
+    :snap_policy: none
+    :qos_policy: csg_scratch
+    :snap_percent: 0
+    :export_policy: CSG_Default_0001
+
+  safe:
+    :max_size: 15TB
+    :size: 8TB
+    :snap_policy: csg_safe
+    :qos_policy: csg_safe
+    :snap_percent: 5
+    :export_policy: CSG_Default_0001
+
+  global:
+    :max_size: 2TB
+    :size: 2TB
+    :snap_policy: csg_global
+    :qos_policy: csg_global
+    :snap_percent: 10
+    :export_policy: CSG_Default_0001
+
+  database_ns:
+    :max_size: 8TB
+    :size: 5TB
+    :snap_policy: none
+    :qos_policy: csg_safe
+    :snap_percent: 0
+    :export_policy: CSG_Default_0001
+
+  database_backup:
+    :max_size: 8TB
+    :size: 5TB
+    :snap_policy: csg_safe
+    :qos_policy: csg_safe
+    :snap_percent: 5
+    :export_policy: CSG_Database_0001
+
+  vcs:
+    :max_size: 0
+    :size: 8TB
+    :snap_policy: none
+    :qos_policy: csg_safe
+    :snap_percent: 0
+    :export_policy: CSG_Default_0001

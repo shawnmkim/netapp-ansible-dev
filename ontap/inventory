@@ -1,0 +1,39 @@
+[all:vars]
+#ansible_ssh_common_args='-o StrictHostKeyChecking=no -o userknownhostsfile=/dev/null'
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+ansible_connection=ssh
+ansible_user=ken
+ansible_become_pass=netapp1234
+
+[linux:children]
+debian
+ubuntu
+centos
+
+[linux:vars]
+
+# Disable StrictHostKeyChecking @ Inventory leve
+# ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+[debian]
+buster ansible_host=192.168.7.179
+
+[ubuntu]
+ubuntu-client ansible_host=192.168.7.176  #ansible_ssh_extra_args='-o StrictHostKeyChecking=no'
+mint ansible_host=192.168.7.178  #ansible_ssh_extra_args='-o StrictHostKeyChecking=no'
+
+[centos]
+centos-client ansible_host=192.168.7.177  #ansible_ssh_extra_args='-o StrictHostKeyChecking=no'
+
+[centos:vars]
+#ansible_user=root
+
+[win]
+192.168.7.3  shortname=winad
+
+[win:vars]
+ansible_user=administrator
+ansible_password=P@$$w0rd!
+ansible_connection=winrm
+ansible_winrm_server_cert_validation=ignore
+

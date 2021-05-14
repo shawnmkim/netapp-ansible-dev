@@ -1,0 +1,41 @@
+netapp_username: admin
+netapp_password: netapp1234
+# cluster: lnoc-01  # site (Lab) + vender (NetApp) + technology (ONTAP) + item
+cluster: sandbox
+cluster_mgmt: 192.168.7.200
+subnet: 255.255.255.0
+gateway: 192.168.7.1
+node1:
+  # cluster_intra: 169.254.77.225
+  # dhcp_ip: 192.168.7.43
+  node_mgmt_ip: 192.168.7.201
+  # ONTAP 9.7 vsims
+  dhcp_ip: 192.168.7.48
+  cluster_intra: 169.254.123.62
+node2:
+  # cluster_intra: 169.254.140.174
+  # dhcp_ip: 192.168.7.44
+  node_mgmt_ip: 192.168.7.203
+  # ONTAP 9.7 vsims
+  dhcp_ip: 192.168.7.57
+  cluster_intra: 169.254.62.18
+
+# ONTAP 9.7 vsims
+# Node 1
+# cluster_intra: 169.254.123.62
+# cluster_intra: 169.254.18.120
+# Node 2
+# cluster_intra: 169.254.23.240
+# cluster_intra: 169.254.58.243
+# ONTAP 9.8 vsims
+# cluster_intra: 169.254.77.225
+# dhcp_ip: 192.168.7.43
+# cluster_intra: 169.254.140.174
+# dhcp_ip: 192.168.7.44
+# Extras
+# cluster_intra: 169.254.58.243
+
+mgmt_lifs:
+  - { hostname: "{{ node1.dhcp_ip }}", node: "{{ cluster }}-01", name: "{{ cluster }}_mgmt", address: "{{ cluster_mgmt }}", role: cluster-mgmt, port: e0c }
+  - { hostname: "{{ cluster_mgmt }}", node: "{{ cluster }}-01", name: "{{ cluster }}-01_mgmt", address: "{{ node1.node_mgmt_ip }}", role: node-mgmt, port: e0c }
+  - { hostname: "{{ cluster_mgmt }}", node: "{{ cluster }}-02", name: "{{ cluster }}-02_mgmt", address: "{{ node2.node_mgmt_ip }}", role: node-mgmt, port: e0c }

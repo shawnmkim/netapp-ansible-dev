@@ -1,0 +1,158 @@
+---
+- name: Create new Active-Directory Domain & Forest + DNS
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+   - vars_winad.yml
+
+  tasks:
+  - name: Add host to Ansible inventory
+    add_host:
+      name: '{{ dc_address }}'
+      ansible_user: .\administrator
+      ansible_password: '{{ lab_password }}'
+      ansible_connection: winrm
+      ansible_winrm_transport: ntlm
+      ansible_winrm_server_cert_validation: ignore
+      ansible_winrm_port: 5986
+
+  - name: Wait for system to become reachable over WinRM
+    wait_for_connection:
+      timeout: 900
+    delegate_to: '{{ dc_address }}'
+
+  - name: Set upstream DNS server
+    win_dns_client:
+      # adapter_names: '*'
+      adapter_names: "vEthernet (Virtual Switch)"
+      ipv4_addresses:
+      - '{{ lab_upstream_dns }}'
+      log_path: C:\dns_log.txt
+    delegate_to: '{{ dc_address }}'
+
+  - name: Disable firewall for Domain, Public and Private profiles
+    win_firewall:
+      state: disabled
+      profiles:
+      - Domain
+      - Private
+      - Public
+    tags: disable_firewall
+    delegate_to: '{{ dc_address }}'
+
+  - name: Change the hostname
+    win_hostname:
+      name: '{{ dc_hostname }}'
+    register: res
+    delegate_to: '{{ dc_address }}'
+
+  - name: Reboot
+    win_reboot:
+    when: res.reboot_required
+    delegate_to: '{{ dc_address }}'
+
+    # Configure ADDS Feature
+  - name: Install Active Directory
+    win_feature:
+        name: AD-Domain-Services
+        include_management_tools: yes
+        include_sub_features: yes
+        state: present
+    register: adds_result
+    delegate_to: '{{ dc_address }}'
+
+  - name: Collect ADDS provision result
+    debug:
+      msg: "{{ adds_result }}"
+
+    # Configure DNS Feature
+  - name: Install DNS Services
+    win_feature:
+      name: DNS
+      include_management_tools: true
+      include_sub_features: true
+      state: present
+    register: dns_result
+    delegate_to: '{{ dc_address }}'
+
+  - name: Collect dns provision result
+    debug:
+      msg: "{{dns_result}}"
+
+  - name: reboot server
+    win_reboot:
+       msg: "Installing AD & DNS. Rebooting..."
+       pre_reboot_delay: 15
+    when: adds_result.reboot_required or dns_result.reboot_required
+    delegate_to: "{{ dc_address }}"
+
+  - name: Wait for system to become reachable over WinRM
+    wait_for_connection:
+      timeout: 900
+
+  - name: Create Domain
+    win_domain:
+       dns_domain_name: '{{ lab_domain }}'
+       safe_mode_password: '{{ lab_password }}'
+    register: ad
+    delegate_to: "{{ dc_address }}"
+
+  - name: Collect ADDS provision result
+    debug:
+      msg: "{{ ad }}"
+
+    # Ensure ADWS service is started
+  - name: ensure ADWS service is started
+    win_service:
+      name: ADWS
+      state: started
+    register: service_status_results
+    delegate_to: "{{ dc_address }}"
+
+  - name: Collect ADWS service status
+    debug:
+      msg: "{{ service_status_results }}"
+
+  #   # Check domain created above has completed configuration and is available
+  # - name: Get Domain Details
+  #   win_shell: C:\Users\Administrator\Documents\get_domain_details.ps1 -domainName {{ lab_domain }}
+  #   register: get_domain_result
+  #   until: Test_domain_result is succeeded
+  #   retries: 3
+  #   delay: 120
+  #   ignore_errors: true
+  #
+  # - name: Collect Test Domain result
+  #   debug:
+  #     msg: "{{ get_domain_result }}"
+
+  - name: Set internal DNS server
+    win_dns_client:
+      # adapter_names: '*'
+      adapter_names: "vEthernet (Virtual Switch)"
+      ipv4_addresses:
+      - '127.0.0.1'
+    delegate_to: '{{ dc_address }}'
+
+  - name: "Create DNS record for {{ item.name }}"
+    win_dns_record:
+      state: present
+      name: '{{ item.name }}'
+      type: '{{ item.type }}'
+      value: '{{ item.value }}'
+      zone: '{{ lab_domain }}'
+    loop: "{{ dns_create_a_records }}"
+    delegate_to: "{{ dc_address }}"
+
+  - name: Check for xRemoteDesktopAdmin Powershell module
+    win_psmodule:
+      name: xRemoteDesktopAdmin
+      state: present
+    delegate_to: "{{ dc_address }}"
+
+  - name: Enable Remote Desktop
+    win_dsc:
+      resource_name: xRemoteDesktopAdmin
+      Ensure: present
+      UserAuthentication: NonSecure
+    delegate_to: "{{ dc_address }}"

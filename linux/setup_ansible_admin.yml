@@ -1,0 +1,47 @@
+---
+- hosts: ubuntu
+  vars:
+    state: present
+    password: $6$mtLEpktNLFLTU419$5XnkaMvbjjIC46Hm58O6FyYh5GiXsosDjmmlurkd0Mi1yiJ56pLqtID4bV2ShwVrzBBSIAZVDv.qoFevl0xpw0
+  handlers:
+  - name: "Restart sshd"
+    service:
+      name: "sshd"
+      state: "restarted"
+
+  tasks:
+
+  - name: "Create ansible user"
+    user:
+      name: ansible
+      password: "{{ password }}"
+      groups: sudo
+      comment: 'Created by Ansible'
+
+  - name: "Add authorized_keys"
+    authorized_key:
+      user: "ansible"
+      key: "{{ lookup('file', 'var/' + 'ansible.key.pub') }}"
+
+  - name: "Allow admin users to sudo without a password"
+    lineinfile:
+      dest: "/etc/sudoers"
+      state: "{{ state }}"
+      ## Assigns all admins
+      #regexp: "^%admin"
+      #line: "%admin ALL=(ALL) NOPASSWD: ALL"
+      # Assigns @ EOF a specific user
+      insertafter: EOF
+      regexp: '^ansible .*'
+      line: 'ansible ALL=(ALL) NOPASSWD: ALL'
+    # Example of how to make this conditional
+    #when: '{{ item.use_sudo }} == True'
+    #with_items: '{{ users }}'
+
+  - name: "Disable root login via ssh"
+    lineinfile:
+      dest: "/etc/ssh/sshd_config"
+      regexp: "^PermitRootLogin"
+      line: "PermitRootLogin no"
+    notify: "Restart sshd"
+

@@ -1,0 +1,389 @@
+# Varibles for ONTAP setup & config
+cluster: sandbox
+cluster_aggr: "{{ cluster | replace('-','_') }}"  # For use with vserver role, Remove '-'s and replace with '_'s
+cluster_mgmt: 192.168.7.200
+node1:
+  node_mgmt_ip: 192.168.7.201
+  icl: 192.168.7.202
+  vs0: 192.168.7.205
+node2:
+  node_mgmt_ip: 192.168.7.203
+  icl: 192.168.7.204
+  vs0: 192.168.7.206
+
+# Authentification Defaults
+netapp_hostname:  "{{ cluster_mgmt }}"
+netapp_username: admin
+netapp_password: netapp1234     # Comment out to use vars_prompt
+validate_certs: false           # Set the default
+
+# Added to support admin publickey setup via REST API
+ontap_endpoint_url: "https://{{ cluster_mgmt }}/api"
+account_name: admin
+
+# DNS Settings
+dns_domain: example.local
+dns_srvrs: 192.168.7.3
+
+# NTP & Timezone Settings
+time: time.example.local
+# time: time.apple.com
+# tzone: 'GMT'               #  <Area/Location Timezone> - Specified in the Olson format
+# tzone: 'ETC/GMT'           #  <Area/Location Timezone> - Specified in the Olson format
+tzone: 'US/Pacific'           #  <Area/Location Timezone> - Specified in the Olson format
+
+# Autosupport Configuration Varibles
+asup_proxy_url:
+asup_transport: smtp
+asup_noteto: admin@example.local
+asup_mailhosts: 192.168.7.3
+asup_hostsubj: true
+asup_to: 'netapp_admin@example.local'
+# asup_to: ['netapp_admin@example.local']
+asup_from: '{{ cluster }}@example.local'
+asup_partner:
+
+# SNMP Location
+snmp_loc: 'VSIM'
+
+# Networking Varibles
+#ifgrp_ports: "e0e,e0f"
+ifgrp_ports: "e0f"
+vlan_id: 42
+
+# Service Processor Settings
+sp_netmask: 255.255.255.224
+sp_gateway: 10.237.60.65
+
+# SVM Settings
+svm: ontap-vs01
+svm_root: "{{ svm | replace('-','_') }}"
+svm_root_perms: 644
+svm_netmask: 255.255.255.0
+svm_gateway: 192.168.7.1
+svm_network: 192.168.7.0/24
+# svm_subnet_ip_ranges: "{{ ['192.168.7.212', '192.168.7.217'] }}"
+
+###
+# LDAP Configuration Varibles
+
+ldap_configname: lab
+ad_domain: example.local
+ldap_servers: 172.30.16.226
+ldap_schema: 'RFC-2307'
+ldap_port: 389
+ldap_query_timeout: 3
+# ldap_min_bind_level: 'anonymous'
+ldap_min_bind_level: 'sasl'
+ldap_use_start_tls: 'false'
+ldap_session_security: 'none'
+
+# ldap_base_dn: "dc=lab,ou=bu,o=company"
+# ldap_base_scope: 'subtree'
+# ldap_bind_dn: "dc=lab,ou=bu,o=company"
+
+ldap_base_dn: "ou=example,o=local"
+ldap_base_scope: 'subtree'
+ldap_bind_dn: "ou=example,o=local"
+
+ldap_user_dn: "cn=users,dc=lab,ou=bu,o=company"
+ldap_group_dn: "cn=groups,dc=lab,ou=bu,o=company"
+ldap_netgroup_dn: "cn=netgroup,dc=lab,ou=bu,o=company"
+
+###
+# Role-Based:  Role Configuration varibles
+###
+
+# Broadcast Domain varibles
+bd:
+  mgmt: MGMT
+  nas: NFS
+
+###
+# Cluster Config
+# Note: nodename reflects the default naming convention in the role.
+
+# license_codes: YFIZOMAFXMSMUCKQBPBAAAAAAAAA,ENVNLMAFXMSMUCKQBPBAAAAAAAAA,KYALNGPCCLPKICKQBPBAAAAAAAAA,QFOZJGPCCLPKICKQBPBAAAAAAAAA
+license_codes: QDDSVRRRYVHXCFABGAAAAAAAAAAA,MBXNQRRRYVHXCFABGAAAAAAAAAAA,ANGJKUNFXMSMUCEZFAAAAAAAAAAA,UFTUNUNFXMSMUCEZFAAAAAAAAAAA
+
+disks: # disks module assigns all visiable disks to a node.
+    - "{{ cluster }}-01"
+    - "{{ cluster }}-02"
+
+# MOTD
+# motd: "{{ motd_mess }}"
+
+dns:  # Set DNS for Cluster
+  - { dns_domains: "{{ dns_domain }}", dns_nameservers: "{{ dns_srvrs }}" }
+
+ntp:  # Set NTP Server (requires the cluster to have DNS set)
+  - { server_name: "{{ time }}", version: auto }
+  # - { server_name: pool.ntp.org, version: auto }
+  # - { server_name: time.nist.gov, version: auto }
+  # - { server_name: time.apple.com, version: auto }
+  # - { server_name: time-nwk.apple.com, version: auto }
+  # - { server_name: time-sac.apple.com, version: auto }
+  # - { server_name: time-st1.apple.com, version: auto }
+
+snmp:	# Setup or modify an SNMP community
+  - { community_name: public, access_control: ro }
+
+aggrs:  # Create one or more Aggregates. (Update role for is_mirrored)
+  - { name: "{{ cluster }}_01_aggr1", node: "{{ cluster }}-01", disk_count: 40, max_raid: 20 }
+  - { name: "{{ cluster }}_02_aggr1", node: "{{ cluster }}-02", disk_count: 40, max_raid: 20 }
+  # - { name: "{{ cluster_aggr }}_01_aggr1", node: "{{ cluster }}-01", disk_count: 40, max_raid: 20, mirror: true }
+
+ports:  # Set MTU for ports
+  - { node: "{{ cluster }}-01", port: e0d, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-01", port: e0e, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-01", port: e0f, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-02", port: e0d, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-02", port: e0e, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-02", port: e0f, mtu: 1500, flowcontrol: none }
+
+ifgrps:  # Create and add ports to Interface Groups.
+  - { name: a0a, node: "{{ cluster }}-01", ports: "{{ ifgrp_ports }}", mode: multimode_lacp, mtu: 1500 }
+  - { name: a0a, node: "{{ cluster }}-02", ports: "{{ ifgrp_ports }}", mode: multimode_lacp, mtu: 1500 }
+
+vlans:  # Create vlans on LIFS
+  - { id: "{{ vlan_id }}", node: "{{ cluster }}-01", parent: a0a }
+  - { id: "{{ vlan_id }}", node: "{{ cluster }}-02", parent: a0a }
+
+bcasts:  # Create Broadcast domains
+  - { name: "{{ bd.nas }}", mtu: 1500, ipspace: default,
+      ports: "{{ cluster }}-01:e0e,{{ cluster }}-01:a0a,{{ cluster }}-02:e0e,{{ cluster }}-02:a0a" }
+  - { name: "{{ bd.mgmt }}", mtu: 1500, ipspace: default,
+      ports: "{{ cluster }}-01:e0d,{{ cluster }}-02:e0d,{{ cluster }}-01:e0c,{{ cluster }}-02:e0c" }
+
+
+inters: # Create intercluster lifs for SnapMirror.
+  - { name: "{{ cluster }}-01_icl1", address: "{{ node1.icl }}", netmask: "{{ svm_netmask }}", node: "{{ cluster }}-01", port: e0d }
+  - { name: "{{ cluster }}-01_icl2", address: "{{ node2.icl }}", netmask: "{{ svm_netmask }}", node: "{{ cluster }}-02", port: e0d }
+
+# sp_config:  # sp_config: Service Processor Network Configuration
+#   - { node: '{{ cluster }}-01', ip_address: 10.1.1.1, netmask: '{{ sp_netmask }}', gateway_ip_address: '{{ sp_gateway }}' }
+#   - { node: '{{ cluster }}-02', ip_address: 10.1.1.2, netmask: '{{ sp_netmask }}', gateway_ip_address: '{{ sp_gateway }}' }
+
+
+asup_config:  # Autosupport configuration
+  - { node: "{{ cluster }}-01", proxy_url: "{{ asup_proxy_url }}", transport: "{{ asup_transport }}", hostsubj: "{{ asup_hostsubj }}", from: "{{ asup_from }}", noteto: "{{ asup_noteto }}", to: "{{ asup_to }}", partner: "{{ asup_partner }}", mailhosts: "{{ asup_mailhosts }}"  }
+  - { node: "{{ cluster }}-02", proxy_url: "{{ asup_proxy_url }}", transport: "{{ asup_transport }}", hostsubj: "{{ asup_hostsubj }}", from: "{{ asup_from }}", noteto: "{{ asup_noteto }}", to: "{{ asup_to }}", partner: "{{ asup_partner }}", mailhosts: "{{ asup_mailhosts }}"  }
+
+
+###
+# Vserver Configuration
+###
+
+vservers:  # Vservers to create # aggr_list is optional.  'aggr_list' is optional, f not specified, defaults to all aggregates.
+  - { name: "{{ svm }}", aggr: "{{ cluster_aggr }}_01_aggr1", protocol: nfs, rootvol: "{{ svm_root }}", aggr_list: "{{ cluster_aggr }}_01_aggr1,{{ cluster_aggr }}_02_aggr1", unix_permissions: "{{ svm_root_perms }}" }
+
+
+vserver_dns:  # DNS at the Vserver level
+  - { vserver: "{{ svm }}", dns_domains: "{{ dns_domain }}", dns_nameservers: "{{ dns_srvrs }}" }
+
+lifs:  # interfaces for the Vservers being created
+  - { name: "{{ svm }}_data_lif2", vserver: "{{ svm }}", node: "{{ cluster }}-01", port: e0d, protocol: nfs, address: "{{ node1.vs0 }}", netmask: "{{ svm_netmask }}" }
+  - { name: "{{ svm }}_data_lif6", vserver: "{{ svm }}", node: "{{ cluster }}-02", port: e0d, protocol: nfs, address: "{{ node2.vs0 }}", netmask: "{{ svm_netmask }}" }
+
+gateway:  # To configure the default route/gateway for the vservers
+  - { vserver: "{{ svm }}", destination: 0.0.0.0/0, gateway: "{{ svm_gateway }}" }
+
+###
+# LDAP Configuration
+###
+
+# LDAP Configuration
+ldap_config:
+# ad_domain & ldap_servers are mutually exclusive
+  - { svm: '{{ svm }}', config_name: '{{ ldap_configname }}', ad_domain: '{{ ad_domain }}', schema: '{{ ldap_schema }}', port: '{{ ldap_port }}', query_timeout: '{{ ldap_query_timeout }}', min_bind_level: '{{ ldap_min_bind_level }}', use_start_tls: '{{ ldap_use_start_tls }}', session_security: '{{ldap_session_security }}' , base_dn: '{{ ldap_base_dn }}', base_scope: '{{ ldap_base_scope }}', bind_dn: '{{ ldap_bind_dn }}' }
+  # - { svm: '{{ svm }}', config_name: '{{ ldap_configname }}', ldap_servers: '{{ ldap_servers }}', schema: '{{ ldap_schema }}', port: '{{ ldap_port }}', query_timeout: '{{ ldap_query_timeout }}', min_bind_level: '{{ ldap_min_bind_level }}', use_start_tls: '{{ ldap_use_start_tls }}', session_security: '{{ldap_session_security }}' , base_dn: '{{ ldap_base_dn }}', base_scope: '{{ ldap_base_scope }}', bind_dn: '{{ ldap_bind_dn }}' }
+
+# LDAP Client-User, Group, Netgroup DN Config
+ldap_client_config:
+  # - { command: 'ldap client modify modify -vserver {{ svm }} -client-config '{{ ldap_configname }}' -ad-domain '{{ ad_domain }}' -user-dn {{ svm_ldap_user_dn }} -group-dn {{ svm_ldap_group_dn }} -netgroup-dn {{ svm_ldap_netgroup_dn }}' }
+  - { command: 'ldap client modify modify -vserver {{ svm }} -client-config {{ ldap_configname }} -ad-domain {{ ldap_ad_domain }} -user-dn {{ svm_ldap_user_dn }} -group-dn {{ svm_ldap_group_dn }} -netgroup-dn {{ svm_ldap_netgroup_dn }}' }
+
+# LDAP NSS Configuration
+nss_config:
+  - { svm: '{{ svm }}', db_type: namedb, sources: 'files,ldap' }
+  - { svm: '{{ svm }}', db_type: hosts, sources: 'files,ldap' }
+  - { svm: '{{ svm }}', db_type: group, sources: 'files,ldap' }
+  - { svm: '{{ svm }}', db_type: passwd, sources: 'files,ldap' }
+  - { svm: '{{ svm }}', db_type: netgroup, sources: 'files,ldap' }
+
+###
+# LDAP NSS - DBs & Sources Information for reference
+###
+# -database hosts -sources $nsHostSource"
+# -database group -sources $nsGroupSource"
+# -database passwd -sources $nsPasswordSource"
+# -database netgroup -sources $nsNetgroupSource"
+
+
+###
+# Non-Role-Based: Standard Config
+###
+
+###
+# Broadcast-domain Management of active ports
+###
+bcd_split_ports:
+  - { origin_bd: Default, new_bd: MGMT, ports: '{{ cluster }}-01:e0c, {{ cluster }}-02:e0c' }
+  # - { origin_bd: Default, new_bd: MGMT, ports: '["{{ cluster }}-01:e0c", "{{ cluster }}-02:e0c"]' }
+
+###
+# MOTD Varible
+###
+motd_mess: |
+  ****************************************************************************
+  *
+  * Welcome \N, today is \d.
+  * You are currently logged into Node/SVM; \n.
+  * On cluster \C, running \s \r.  Your last login was \L.
+  *
+  ****************************************************************************
+
+###
+# Export-Policy Management
+###
+svm_export_policy_name:
+  - { svm: "{{ svm }}", name: 'DCRO' }
+  - { svm: "{{ svm }}", name: 'DC' }
+  - { svm: "{{ svm }}", name: 'Avere' }
+
+export_policy_rules_list:
+  - { name: 'default', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: any, ro_rule: 'any', rw_rule: 'any', super_user_security: 'any' }
+  - { name: 'DCRO', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: nfs, ro_rule: 'any', rw_rule: 'never', super_user_security: 'sys' }
+  - { name: 'DCRO', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: nfs, ro_rule: 'any', rw_rule: 'never', super_user_security: 'none' }
+  - { name: 'DC', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: nfs, ro_rule: 'any', rw_rule: 'any', super_user_security: 'sys' }
+  - { name: 'DC', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: nfs, ro_rule: 'any', rw_rule: 'any', super_user_security: 'none' }
+  - { name: 'Avere', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: nfs, ro_rule: 'any', rw_rule: 'any', super_user_security: 'sys' }
+
+###
+# LS Mirrors
+###
+ls_mirrors:
+  - { aggr: "{{ cluster | replace('-','_') }}_01_aggr1", name: "{{ svm | replace('-','_') }}_root_mir1", svm: "{{ svm }}" }
+  - { aggr: "{{ cluster | replace('-','_') }}_02_aggr1", name: "{{ svm | replace('-','_') }}_root_mir2", svm: "{{ svm }}" }
+
+
+###
+# RBAC Configuration
+# User and Role Configuration Varibles
+###
+role_cmds:
+  - { name: 'netapp_harvest', cmddir: 'version', level: 'readonly', svm: "{{ cluster }}" }
+  - { name: 'netapp_harvest', cmddir: 'cluster identity show', level: 'readonly', svm: "{{ cluster }}" }
+  - { name: 'netapp_harvest', cmddir: 'cluster show', level: 'readonly', svm: "{{ cluster }}" }
+  - { name: 'netapp_harvest', cmddir: 'system node show', level: 'readonly', svm: "{{ cluster }}" }
+  - { name: 'netapp_harvest', cmddir: 'statistics', level: 'readonly', svm: "{{ cluster }}" }
+  - { name: 'netapp_harvest', cmddir: 'lun show', level: 'readonly', svm: "{{ cluster }}" }
+  - { name: 'netapp_harvest', cmddir: 'network interface show', level: 'readonly', svm: "{{ cluster }}" }
+  - { name: 'netapp_harvest', cmddir: 'qos workload show', level: 'readonly', svm: "{{ cluster }}" }
+
+user_list:
+  - { name: 'netapp_harvest', app: 'ontapi', auth: 'password', role: 'netapp_harvest', pass: 'T3mp-p@55', svm: "{{ cluster }}" }
+  - { name: 'netapp_pse', app: 'ontapi', auth: 'password', role: 'admin', pass: 'T3mp-p@55', svm: "{{ cluster }}" }
+  - { name: 'netapp_pse', app: 'console', auth: 'password', role: 'admin', pass: 'T3mp-p@55', svm: "{{ cluster }}" }
+  - { name: 'netapp_pse', app: 'http', auth: 'password', role: 'admin', pass: 'T3mp-p@55', svm: "{{ cluster }}" }
+  - { name: 'netapp_pse', app: 'service-processor', auth: 'password', role: 'admin', pass: 'T3mp-p@55', svm: "{{ cluster }}" }
+  - { name: 'netapp_pse', app: 'ssh', auth: 'password', role: 'admin', pass: 'T3mp-p@55', svm: "{{ cluster }}" }
+  - { name: 'storage_api', app: 'ontapi', auth: 'password', role: 'admin', pass: 'T3mp-p@55', svm: "{{ cluster }}" }
+  - { name: 'storage_api', app: 'ontapi', auth: 'password', role: 'vsadmin', pass: 'T3mp-p@55', svm: "{{ svm }}" }
+  # - { name: 'snmp', app: 'snmp', auth: 'usm', role: 'readonly', pass: 'T3mp-p@55', svm: "{{ svm }}" }
+
+###
+# Event Destinations & Log Forwarding
+# Needs more attention to ensure configuration is correct
+###
+
+
+
+###
+# Custom Modifications
+###
+
+# Enable discovery tools for Config Advisor
+cdp: "run -node * options cdpd.enable on"
+lldp: "run -node * options lldp.enable on"
+
+# Modify Default Password Security
+sec_passwd: "security login role config modify -passwd-alphanum disabled -role admin -vserver {{ cluster }}"
+sec_login_reuse: "security login role config modify -role admin -disallowed-reuse 1 -vserver {{ cluster }}"
+
+# Disable SFO autogiveback
+autogiveback: "storage failover modify -node * -auto-giveback false"
+
+# Disable SystemManager
+sysmgr: "vserver services web modify -name sysmgr -enabled false"
+
+# Disable Autosupport Performance Data Upload
+asup_disperf: "system node autosupport trigger modify -node * -autosupport-message performance.data -to enabled"
+
+# Set node "Location" string
+# set_loc: "node mod -node * -location {{ snmp_loc }}"
+set_loc: 'system snmp location -location "{{ snmp_loc }}"'
+
+###
+# Disabling root Aggregate Snapshot Configuration
+###
+
+# Disable Snapshot Schedule
+aggr_sched: "node run -node * -command snap sched -A source95_01_root 0 0 0"
+
+# Remove Snap Reserve
+aggr_sr: "aggr modify -aggregate *_root -percent-snapshot-space 0"
+
+# Check for aggr snapshots
+# aggr_snap_list: "node run -node * -command snap list -A"
+
+###
+# Disabling root volume Snapshot Configuration
+###
+
+# Remove Snap Reserve
+rootvol_sr: "volume modify -volume vol0 -precent_snapshot_reserve 0"
+
+# Disable Snapshot Schedule
+rootvol_sched: "volume modify -volume vol0 -snapshot-policy none"
+
+# Check for vol0 snapshots
+# vol0_snap_list: "volume snapshot show -volume vol0"
+
+
+###
+# Renaming section
+###
+
+# Rename node section - Ex: cluster-01 to clusterh01a
+# Naming convention is cluster+host+instance
+nodename: h
+node_names:
+ - { from_name: "{{ cluster }}-01", name: "{{ cluster }}{{ nodename }}01a" }
+ - { from_name: "{{ cluster }}-02", name: "{{ cluster }}{{ nodename }}01b" }
+#  - { from_name: "{{ cluster }}-03", name: "{{ cluster }}{{ nodename }}02a" }
+#  - { from_name: "{{ cluster }}-04", name: "{{ cluster }}{{ nodename }}02b" }
+
+# Rename root Aggregate section
+aggr0_list:
+  - { name: 'aggr0_{{ cluster }}_01', rename: "{{ cluster }}{{ nodename }}01a_aggr0" }
+  - { name: "aggr0_{{ cluster }}_02", rename: "{{ cluster }}{{ nodename }}01b_aggr0" }
+  #  - { name: "aggr0_{{ cluster }}_03", rename: "{{ cluster }}{{ nodename }}02a_aggr0" }
+  #  - { name: "aggr0_{{ cluster }}_04", rename: "{{ cluster }}{{ nodename }}02b_aggr0" }
+
+# Rename root Volume section
+vol0_list:
+  - { name: 'vol0', rename: "{{ cluster }}{{ nodename }}01a_root", vserver: "{{ cluster }}{{ nodename }}01a" }
+  - { name: 'vol0', rename: "{{ cluster }}{{ nodename }}01b_root", vserver: "{{ cluster }}{{ nodename }}01b" }
+#  - { name: 'vol0', rename: "{{ cluster }}{{ nodename }}02a_root", vserver: "{{ cluster }}{{ nodename }}02a" }
+#  - { name: 'vol0', rename: "{{ cluster }}{{ nodename }}02b_root", vserver: "{{ cluster }}{{ nodename }}02b" }
+
+# Rename lifs section
+lif_rename:
+  - { svm: 'Cluster', lif: "{{ cluster }}-01_clus1", newname: "{{ cluster }}{{ nodename }}01a_clus1" }
+  - { svm: 'Cluster', lif: "{{ cluster }}-01_clus2", newname: "{{ cluster }}{{ nodename }}01b_clus2" }
+  - { svm: 'Cluster', lif: "{{ cluster }}-02_clus1", newname: "{{ cluster }}{{ nodename }}02a_clus1" }
+  - { svm: 'Cluster', lif: "{{ cluster }}-02_clus2", newname: "{{ cluster }}{{ nodename }}02b_clus2" }
+  - { svm: "{{ cluster }}", lif: "cluster_mgmt", newname: "{{ cluster }}_mgmt" }
+  - { svm: "{{ cluster }}", lif: "{{ cluster }}-01_mgmt1", newname: "{{ cluster }}{{ nodename }}01a_mgmt1" }
+  - { svm: "{{ cluster }}", lif: "{{ cluster }}-02_mgmt1", newname: "{{ cluster }}{{ nodename }}02a_mgmt2" }

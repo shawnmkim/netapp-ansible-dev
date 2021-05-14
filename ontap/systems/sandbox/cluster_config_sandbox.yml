@@ -1,0 +1,381 @@
+---
+- hosts: localhost
+  name: 'Cluster Config: {{ cluster }}'
+  gather_facts: no
+  vars:
+    state: present
+    login: &login
+      hostname: "{{ netapp_hostname }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: "{{ validate_certs }}"
+
+  vars_files:
+  - vars/vars_cluster_config_sandbox.yml
+  collections:
+  - netapp.ontap
+
+  tasks:
+
+  ###
+  # Network: Broadcast-domain split
+  ###
+
+  - name: Manage Active Ansible MGMT network interface
+    netapp.ontap.na_ontap_broadcast_domain:
+      state: present
+      <<: *login
+      from_name: "{{ item.origin_bd }}"
+      name: "{{ item.new_bd }}"
+      mtu: '1500'
+      ipspace: Default
+      ports: "{{ item.ports }}"
+      use_rest: Never
+    loop: "{{ bcd_split_ports }}"
+
+  ###
+  # Role: Cluster Configuration
+  # Note: aggr task modified to support sync-mirror: is_mirrored: '{{ mirror }}'
+  ###
+
+  - include_role:
+      name: na_ontap_cluster_config_v2
+
+  ###
+  # Role: Vserver Configuration
+  # Note: rootvol added to vserver create task becuase of - in svm name
+  #     rootvol: "{{ item.name | replace('-','_') }}"
+  ###
+
+  - include_role:
+      name: na_ontap_vserver_create_v2
+
+  ###
+  # Role: LDAP Configuration
+  # Note: Added LDAP Config role
+  ###
+
+  # Disabling temporarily to continue testing the rest of the playbook
+  # - include_role:
+  #     name: na_ontap_ldap_config
+
+
+  ###
+  # LS Mirror: Manage vserver protection
+  ###
+
+  # SnapMirror Configuration
+
+  - name: Create Destination Volume
+    na_ontap_volume:
+      <<: *login
+      state: "{{ state }}"
+      name: "{{ item.name | replace('-','_') }}"
+      aggregate_name: "{{ item.aggr | replace('-','_') }}"
+      size: 1
+      size_unit: gb
+      type: DP
+      space_guarantee: "none"
+      vserver: "{{ item.svm }}"
+      wait_for_completion: True
+    loop: "{{ ls_mirrors }}"
+    # when: type != ls
+
+  # SnapMirror Configuration on Destination
+
+  - name: "Create a SnapMirror LS relationship for {{ svm }}"
+    na_ontap_snapmirror:
+      <<: *login
+      state: "{{ state }}"
+      source_vserver: "{{ item.svm }}"
+      source_volume: "{{ svm | replace('-','_') }}_root"
+      destination_volume: "{{ item.name | replace('-','_') }}"
+      destination_vserver: "{{ item.svm }}"
+      relationship_type: load_sharing
+      schedule: "5min"
+      initialize: True
+    loop: "{{ ls_mirrors }}"
+
+
+  - name: ..... initialize LS mirrors
+    na_ontap_command:
+      <<: *login
+      # privilege: 'advanced'
+      command:       ['snapmirror', 'initialize', '-source-path',
+                      '{{ cluster }}://{{ svm }}/{{ svm_root }}_root', '-destination-path',
+                      '{{ cluster }}://{{ svm }}/{{ item.name }}' ]
+
+    loop: "{{ ls_mirrors }}"
+
+  - name: ..... execute LS updates
+    na_ontap_command:
+      <<: *login
+      # privilege: 'advanced'
+
+      command:       ['snapmirror', 'update-ls-set', '-source-path',
+                      '{{ cluster }}://{{ svm }}/{{ svm_root }}_root' ]
+
+  ###
+  # timezone
+  ###
+
+  - name: 'Set cluster timezone {{ tzone }}'
+    na_ontap_command:
+      <<: *login
+
+      command:        [ 'cluster', 'date', 'modify',
+                        '-timezone', "{{ tzone }}" ]
+
+  ##
+  # Enable Discovery Tools - Config Advisor
+  ##
+
+  # Configure cdpd
+  - name: Enable cdpd
+    na_ontap_command:
+      command: "{{ cdp }}"
+      <<: *login
+
+  # Configure lldp
+  - name: Enable lldp
+    na_ontap_command:
+      command: "{{ lldp }}"
+      <<: *login
+
+  # Disable SFO autogiveback
+  # This won't work on a stand-alone system (No HA/SFO)
+  - name: Disable SFO autogiveback
+    na_ontap_command:
+      command: "{{ autogiveback }}"
+      <<: *login
+
+  # Set System SNMP Location
+  - name: Set Location string on each node
+    na_ontap_command:
+      command: "{{ set_loc }}"
+      <<: *login
+
+
+  # # Modify Password Security defaults - No longer a requirement
+  # - name: Modify Password Security defaults
+  #   na_ontap_command:
+  #     command: "{{ sec_passwd }}"
+  #     <<: *login
+
+  # # Disable Modify Password reuse policy - No longer a requirement
+  # - name: Disable Modify Password reuse policy
+  #   na_ontap_command:
+  #     command: "{{ sec_login_reuse }}"
+  #     <<: *login
+
+  # # Disable SystemManager - No longer a requirement
+  # - name: Disable SystemManager
+  #   na_ontap_command:
+  #     command: "{{ sysmgr }}"
+  #     <<: *login
+  #
+  # # Disable Autosupport Performance Data Upload - No longer a requirement
+  # - name: Disable Autosupport Performance Data Upload
+  #   na_ontap_command:
+  #     command: "{{ asup_disperf }}"
+  #     <<: *login
+
+  ###
+  # System Aggregate & Volume Configuration changes
+  ###
+
+  # Configure Aggregate snapshots
+  - name: Disable aggregate snapshots
+    na_ontap_command:
+      command: "{{ aggr_sched }}"
+      <<: *login
+
+  # Remove Aggregate Snap Reserve
+  - name: Remove aggregate snap reserve
+    na_ontap_command:
+      command: "{{ aggr_sr }}"
+      <<: *login
+
+  # Configure root volume snapshots
+  - name: Disable Root Volume snapshots
+    na_ontap_command:
+      command: "{{ rootvol_sched }}"
+      <<: *login
+
+  # Remove Root Volume snap reserve
+  - name: Disable Root Volume snap reserve
+    na_ontap_command:
+      command: "{{ rootvol_sr }}"
+      <<: *login
+
+
+  ###
+  # Snapshots: Adjust 'default' policy
+  ###
+
+  - name: Modify 'default' Snapshot policy
+    na_ontap_snapshot_policy:
+      <<: *login
+      state: "{{ state }}"
+      name: default
+      schedule: weekly
+      count: 0
+      enabled: True
+
+
+  ###
+  # Schedule: Create 'default' policy
+  ###
+
+  - name: Create Job Schedule for every minute
+    na_ontap_job_schedule:
+      <<: *login
+      state: "{{ state }}"
+      name: 1min
+      job_minutes: -1
+
+
+  ###
+  # Configure Users and Roles
+  ###
+
+  # Creates user roles.
+  - name: Create User Role
+    na_ontap_user_role:
+      state: present
+      name: "{{ item.name }}"
+      command_directory_name: "{{ item.cmddir }}"
+      access_level: "{{ item.level }}"
+      vserver: "{{ item.svm }}"
+      <<: *login
+    loop: "{{ role_cmds }}"
+
+  # Creates users.
+  - name: Create Users
+    na_ontap_user:
+      state: present
+      name: "{{ item.name }}"
+      application: "{{ item.app }}"
+      authentication_method: "{{ item.auth }}"
+      role_name: "{{ item.role }}"
+      vserver: "{{ item.svm }}"
+      <<: *login
+    loop: "{{ user_list }}"
+
+
+
+  ###
+  # Export-Policies: Create and Manage
+  ###
+
+  - name: 'Remove default Export-policy entry: RO = ALL'
+    na_ontap_export_policy_rule:
+      state: absent
+      policy_name: default
+      vserver: "{{ svm }}"
+      rule_index: "{{ item.rule_index | default(1) }}"
+      <<: *login
+
+  # Managing Export-policies
+
+  - name: Create SVM Export-policy
+    na_ontap_export_policy:
+      state: "{{ state }}"
+      name: "{{ item.name }}"
+      vserver: "{{ item.svm }}"
+      <<: *login
+    loop: "{{ svm_export_policy_name }}"
+
+  - name: Setup "Default" and SVM Export-policies
+    na_ontap_export_policy_rule:
+      state: "{{ state }}"
+      policy_name: "{{ item.name }}"
+      vserver: "{{ item.svm }}"
+      client_match: "{{ item.client_match }}"
+      protocol: "{{ item.protocol }}"
+      ro_rule: "{{ item.ro_rule }}"
+      rw_rule: "{{ item.rw_rule }}"
+      rule_index: "{{ item.rule_index | default(omit)}}"
+      super_user_security: "{{ item.super_user_security }}"
+      <<: *login
+    loop: "{{ export_policy_rules_list }}"
+
+ ###
+ # SVM Advanced Configuration
+ ###
+
+ # Setting SVM root_vol permissions
+
+  # - name: Setting SVM root_vol permissions
+  #   na_ontap_volume:
+  #     state: "{{ state }}"
+  #     name: "{{ svm_root }}"
+  #     vserver: "{{ svm }}"
+  #     unix_permissions: "{{ svm_root_perms }}"
+  #     <<: *login
+
+
+  ###
+  # Event Destination & Log Forwarding: Configuration
+  ###
+
+  - name: Create log forwarding destination
+    na_ontap_command:
+      <<: *login
+      return_dict: yes
+      command:        [ 'cluster', 'log-forwarding',
+                        'create', '-destination', '17.142.199.141',
+                        '-facility', 'user']
+
+  - name: Create event destination
+    na_ontap_command:
+      <<: *login
+      return_dict: yes
+      command:        [ 'event', 'notification', 'destination',
+                        'create', '-name', 'splunk',
+                        '-syslog', '17.142.199.141']
+
+
+  ###
+  # Custom Modification to default settings
+  ###
+
+  # ###
+  # Security: Manage Weak Ciphers
+  # Note: This requires a reboot to go into affect
+  # advanced privilege mode
+  # 'security config show & security config status show'
+  # ###
+  #
+  # - name: 'Disable all but TLSv1.2 and strong ciphers'
+  #   na_ontap_command:
+  #     <<: *login
+  #     privilege: 'advanced'
+  #
+  #     command:        [ 'security', 'config', 'modify','-interface', 'SSL',
+  #                       '-supported-protocols', 'TLSv1.2', '-supported-ciphers',
+  #                       'AES:!LOW:!MEDIUM:!aNULL:!EXP:!eNULL:!3DES' ]
+  #
+  # ###
+  # # Statistics: Enable client-stats
+  # ###
+  #
+  # - name: 'Enable -client-stats for statistics'
+  #   na_ontap_command:
+  #     <<: *login
+  #     privilege: 'advanced'
+  #
+  #     command:        [ 'statistics', 'settings', 'modify',
+  #                       '-client-stats', 'enable' ]
+
+
+  # # Invole Autosupport
+  # - name: Invoke Autosupport POST Configuration
+  #   na_ontap_autosupport_invoke:
+  #     name: "{{ item.node }}"
+  #     message: "Invoke Autosupport - POST Config"
+  #     type: test
+  #
+  #     <<: *login
+  #   loop: "{{ asup_config }}"

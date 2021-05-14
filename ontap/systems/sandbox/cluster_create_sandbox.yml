@@ -1,0 +1,76 @@
+---
+- hosts: localhost
+  name: "Build cluster: {{ cluster }}"
+  gather_facts: false
+  collections:
+    - netapp.ontap
+  vars_files: "{{ file }}"
+  vars:
+    file: vars_cluster_create_sandbox.yml
+    login: &login
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: false
+  # vars_prompt:  # For NetApp Admin Credentials
+  #   - name: netapp_username
+  #     prompt: NetApp 'admin'
+  #   - name: netapp_password
+  #     prompt: NetApp 'admin' password
+  #     secret: true
+
+  # Steps to prepare for ansible cluster create
+  # 1) log into system
+  # 2) Set password for admin
+  # 3) Capture intra-cluster-lif IP
+
+  tasks:
+
+  - name: Create a cluster
+    na_ontap_cluster:
+      state: present
+      cluster_name: "{{ cluster }}"
+      hostname: "{{ node1.dhcp_ip }}"
+      <<: *login
+
+  - name: "Join Node to {{ cluster }}"
+    na_ontap_cluster:
+      state: present
+      cluster_ip_address:  "{{ node2.cluster_intra }}"
+      # node_name: ontap02
+      hostname: "{{ node1.dhcp_ip }}"
+      <<: *login
+
+  - name: 'Create Management lifs: "{{ cluster }}"'
+    na_ontap_interface:
+      state: present
+      interface_name: "{{ item.name }}"
+      vserver: "{{ cluster }}"
+      address: "{{ item.address }}"
+      netmask: "{{ subnet }}"
+      role: "{{ item.role }}"
+      home_node: "{{ item.node }}"
+      home_port: "{{ item.port }}"
+      hostname: "{{ item.hostname }}"
+      <<: *login
+    loop: "{{ mgmt_lifs }}"
+
+  - name: Create User
+    na_ontap_user:
+      state: present
+      name: admin
+      applications: ssh,console,http,ontapi
+      # applications: ssh,console,http,ontapi,service-processor
+      authentication_method: password
+      role_name: admin
+      vserver: "{{ cluster }}"
+      hostname: "{{ cluster_mgmt }}"
+      <<: *login
+
+  - name: remove auto mgmt lif
+    na_ontap_interface:
+      state: absent
+      interface_name: "{{ cluster }}-01_mgmt_auto"
+      vserver: "{{ cluster }}"
+      hostname: "{{ cluster_mgmt }}"
+      <<: *login

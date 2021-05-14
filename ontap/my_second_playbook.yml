@@ -1,0 +1,54 @@
+---
+- hosts: "localhost"
+  connection: "local"
+  vars:
+    users:
+    - username: 'rusty'
+      groups: "admin,www-data"
+    - username: 'suzie'
+      groups: "www-data"
+    - username: 'ruby'
+      groups: "staff,adm"
+    - username: 'rocky'
+      groups: "www-data"
+    remove_users:
+    - rocky
+  handlers:
+  - name: "Restart sshd"
+    service:
+      name: "sshd"
+      start: "restarted"
+
+  tasks:
+
+  - name: "Create user accounts and add users to groups"
+    user:
+      name: "{{ item.username }}"
+      groups: "{{ item.groups }}"
+      state: 'present'
+    loop: "{{ users }}"
+
+  - name: 'Remove old user accounts'
+    user:
+      name: "{{ item }}"
+    loop: "{{ remove_users }}"
+
+  - name: "Add authorized keys"
+    authorized_key:
+      user: "{{ item.username }}"
+      ken: "{{ lookup('file', 'files/' + item.username+ '.key.pub') }}"
+    loop: "{{ users }}"
+
+  - name: "Allow admin users to sudo without a password"
+    lineinfile:
+      dest: "/etc/sudoers"
+      state: "present"
+      regexp: "^%admin"
+      line: "%admin ALL=(ALL) NOPASSWD: ALL"
+  - name: "Disable root login via SSH"
+    lineinfile:
+      dest: "/etc/ssh/sshd_config"
+      regexp: "^PermitRootLogin"
+      line: "PermitRootLogin no"
+    notify: "Restart sshd"
+

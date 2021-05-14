@@ -1,0 +1,9 @@
+---
+- hosts: all
+  user: ken
+  tasks:
+      - name: Ping all hosts
+        ping:
+      - name: Print a message
+        debug:
+            msg: 'All set'

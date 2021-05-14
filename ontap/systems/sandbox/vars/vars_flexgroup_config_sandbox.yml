@@ -1,0 +1,32 @@
+# Varibles for ONTAP setup & config
+cluster: sandbox
+cluster_aggr: "{{ cluster | replace('-','_') }}"  # For use with vserver role, Remove '-'s and replace with '_'s
+cluster_mgmt: 192.168.7.200
+node1:
+  node_mgmt_ip: 192.168.7.201
+  icl: 192.168.7.202
+  vs0: 192.168.7.205
+node2:
+  node_mgmt_ip: 192.168.7.203
+  icl: 192.168.7.204
+  vs0: 192.168.7.206
+
+# Authentification Defaults
+netapp_hostname: "{{ cluster_mgmt }}"
+netapp_username: admin
+netapp_password: netapp1234     # Comment out to use vars_prompt
+validate_certs: false           # Set the default
+
+# SVM configuration
+svm: ontap-vs01
+
+###
+# Module-Based:  Flexgroup Configuration varibles
+###
+
+# Flexgroup
+
+aggr_list:
+  - { "{{ cluster }}_01_aggr1","{{ cluster }}_02_aggr1"  }
+
+volname: fg01

@@ -1,0 +1,25 @@
+---
+- name: Create new Active-Directory Domain & Forest
+  hosts: localhost
+  vars_files:
+   - vars_winad.yml
+  gather_facts: false
+  tasks:
+  - name: Add host to Ansible inventory
+    add_host:
+      name: '{{ dc_address }}'
+      ansible_user: .\administrator
+      ansible_password: '{{ lab_password }}'
+      ansible_connection: winrm
+      ansible_winrm_transport: ntlm
+      ansible_winrm_server_cert_validation: ignore
+      ansible_winrm_port: 5986
+
+  - win_domain_membership:
+    dns_domain_name: cloud.local
+      hostname: win2016test
+      domain_admin_user: administrator@cloud.local
+      domain_admin_password:
+      domain_ou_path: "OU=Servers,DC=cloud,DC=local"
+      state: domain
+    register: domain_state

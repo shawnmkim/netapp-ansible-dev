@@ -1,0 +1,79 @@
+---
+- hosts: all
+  become: yes
+  vars:
+    users:
+        - username: 'reed'
+        - username: 'sue'
+        - username: 'johnny'
+        - username: 'ben'
+        - username: 'galactus'
+        - username: 'drdoom'
+    users_to_remove:
+        - name: 'drdoom'
+  tasks:
+
+  - name: Adding Fantastic_Four group
+    group:
+        name: Fantastic_Four
+        state: present
+
+  - name: Adding Avengers group
+    group:
+        name: avengers
+        state: present
+
+  - name: Add avengers Group to the sudoers
+    copy:
+        content: "%avengers ALL=(ALL:ALL) NOPASSWD:ALL"
+        dest: /etc/sudoers.d/020_avengers-sudo-nopasswd
+        mode: 0440
+
+  - name: Adding User {{ item.username }}
+    user:
+        name: '{{ item.username }}'
+        create_home: yes  # createhome is an alias to this
+        comment: 'Created with Ansible by Darth Vader'
+        password: '{{ "password" | password_hash("sha512") }}'
+        update_password: on_create
+        #groups: avengers, Fantastic_Four  #can be written thisway 
+        groups: 
+        - Fantastic_Four
+        - avengers
+    loop: "{{ users }}"
+    
+  - name: Create SSH Folders
+    file:
+        path: "/home/{{ item.username }}/.ssh"
+        state: directory
+        owner: '{{ item.username }}'
+    loop: '{{ users }}'
+
+  - name: Create Authorized Keys File
+    file:
+        path: "/home/{{ item.username }}/.ssh/Authorized_Keys"
+        state: touch
+        owner: '{{ item.username }}'
+    loop: '{{ users }}'
+  - name: Copy SSH Key to Users Home Directory
+    copy:
+        src: "{{ item.username }}_id_rsa_2048.pub"
+        dest: "/home/{{ item.username }}/{{ item.username }}_id_rsa_2048.pub"
+        owner: "{{ item.username }}"
+    loop: "{{ users }}"
+
+  - name: Remove User Account
+    user:
+        name: "{{ item.name }}"
+        state: absent
+        remove: yes
+        force: yes
+    loop: "{{ users_to_remove }}"
+
+  - name: Manage SSH keys
+    authorized_key:
+        user: "{{ item.username }}"
+        key: "{{ item.key }}"
+        state: present
+    loop: "{{ users }}"
+

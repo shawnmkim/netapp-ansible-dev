@@ -1,0 +1,25 @@
+---
+- hosts: all
+  tasks:
+      - name: ansible creates multiple directories
+        file:
+            path: "{{ item }}"
+            state: directory
+            mode: "u=rw,g=rx,o=rx"
+            recurse: yes
+        loop:
+            - '/tmp/devops_system1'
+            - '/tmp/devops_system2'
+            - '/tmp/devops_system3'
+
+      - name: ansible creates multiple directories with different permissions
+        file:
+            path: "{{ item.dest }}"
+            mode: "{{ item.mode }}"
+            state: directory
+            recurse: yes
+        loop:
+            - { dest: '/tmp/devops_difsystem1', mode: '0777' }
+            - { dest: '/tmp/devops_difsystem2', mode: '0707' }
+            - { dest: '/tmp/devops_difsystem3', mode: '0575' }
+            - { dest: '/tmp/devops_difsystem4', mode: '0755' }

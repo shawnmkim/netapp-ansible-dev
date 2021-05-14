@@ -1,0 +1,27 @@
+---
+- hosts: localhost
+  gather_facts: false
+  collections:
+    - netapp.ontap
+  vars:
+      netapp_hostname: 192.168.7.190
+      netapp_username: admin
+      netapp_password: netapp1234
+  
+  tasks:
+
+  - name: Display ONTAP_info ALL
+    na_ontap_info:
+      state: info
+      hostname: "{{ netapp_hostname }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: false
+
+      use_rest: Auto
+      gather_subset: 
+      - all
+    register: ontap_info
+  - debug:
+      msg: "{{ ontap_info.ontap_info  }}"

@@ -1,0 +1,53 @@
+lab_domain: "example.local"
+lab_password: "P@$$w0rd!"
+lab_netmask: "255.255.255.0"
+lab_netmask_cidr: "24"
+lab_gateway: "192.168.7.1"
+lab_upstream_dns: "192.168.7.1"
+temporary_password: "Changeme!"
+
+dc_hostname: winad
+dc_address: "192.168.7.3"
+
+dns_create_a_records:
+  - {name: "ots-deploy", type: "A", value: "192.168.7.204"}
+  - {name: "guineapig", type: "A", value: "192.168.7.200"}
+  - {name: "guineapig-01", type: "A", value: "192.168.7.201"}
+  - {name: "guineapig-data", type: "A", value: "192.168.7.202"}
+  - {name: "guineapig-icl", type: "A", value: "192.168.7.203"}
+
+esxi_hostname: "esx01"
+esxi_address: "192.168.7.120"
+esxi_username: "root"
+esxi_local_datastore: "datastore1"
+
+vcenter_hostname: "vc01"
+vcenter_address: "192.168.7.22"
+vcenter_username: "administrator@vsphere.local"
+vcenter_datacenter: "Datacenter"
+vcenter_cluster: "Cluster"
+
+ontap_hostname: "guineapig"
+ontap_address: "192.168.7.200"
+ontap_node_address: "192.168.7.201"
+ontap_memory_mb: 6144 # Minimum supported is 16gb, minimum working is 6gb.  8gb is suggested due to resource constraints on a NUC
+ontap_num_vcpus: 2 # Minimum supported is 4.  Minimum working is 2.  4 may require more ram (>8gb) or a bootarg to set vnvram to 512.
+ontap_svm_name: "svm1"
+ontap_svm_lif: "svm1_lif1"
+ontap_svm_address: "192.168.7.25"
+ontap_vol_labs: "labs"
+ontap_vol_install: "install"
+
+portal_home_dir: 'C:\vlab'
+portal_sitename: 'Lab Portal'
+portal_rdpdomain: 'LAB'
+portal_rdpuser: 'administrator'
+files_path: "/Users/shatfiel/Downloads/NUCLab"
+vaai_plugin: NetAppNasPlugin.v23.vib
+vcenter_ova: "VMware-vCenter-Server-Appliance-6.7.0.20000-10244745_OVF10.ova"
+ontap_select_ova: "9.6RC1_DataONTAPv-esx-standalone-eval-nodar.ova"
+portal_ntap_pstk_msi: "NetApp_PowerShell_Toolkit_9.6.0.msi"
+windows_iso: "Windows_Server_2016_Datacenter_EVAL_en-us_14393_refresh.ISO"
+windows_iso_url: "http://software-download.microsoft.com/download/pr/Windows_Server_2016_Datacenter_EVAL_en-us_14393_refresh.ISO"
+windows_flp: server2016eval.flp
+windows_flp_url: "http://github.madlabber.com/server2016eval.flp"

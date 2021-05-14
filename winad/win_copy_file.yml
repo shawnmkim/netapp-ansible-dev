@@ -1,0 +1,8 @@
+  - name: Create directory structure and copy files to a directory
+    win_file:
+      path: C:\windows\tools
+      state: directory
+  - win_copy:
+      src: /root/test/resources/testfile
+      dest: 'C:\windows\tools'
+      remote_src: no

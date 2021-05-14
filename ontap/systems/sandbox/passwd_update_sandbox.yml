@@ -1,0 +1,64 @@
+---
+- hosts: localhost
+  name: 'SNMP Config: {{ cluster }}'
+  gather_facts: no
+  vars:
+    state: present
+    login: &login
+      hostname: "{{ netapp_hostname }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: "{{ validate_certs }}"
+
+  vars_files:
+  - vars/vars_passwd_update_sandbox.yml
+  collections:
+  - netapp.ontap
+
+  tasks:
+
+  ###
+  # Module-Based: passwd update Configuration
+  ###
+
+  ###
+  # Create a new role
+  # Note: Duplicate admin role privileges
+  ###
+
+  - name: Create User Role
+    na_ontap_user_role:
+      state: "{{ state }}"
+      <<: *login
+
+      name: admin2
+      command_directory_name: DEFAULT
+      access_level: all
+      # query: show
+      vserver: "{{ cluster }}"
+
+  ###
+  # Create a new role
+  # Note: Duplicate admin role privileges
+  ###
+
+  ###
+  # User Passwd Update
+  # Note:
+  ###
+
+  - name: "(Re)Set User passwd: {{ item.username }}"
+    netapp.ontap.na_ontap_user:
+      state: "{{ state }}"
+      <<: *login
+
+      name: "{{ item.username }}"
+      applications: "{{ item.apps }}"
+      authentication_method: "{{ item.auth_method }}"
+      set_password: "{{ item.passwd }}"
+      lock_user: "{{ item.lock }}"
+      role_name: "{{ item.role }}"
+      vserver: "{{ item.svm }}"
+
+    loop: "{{ user_creds }}"

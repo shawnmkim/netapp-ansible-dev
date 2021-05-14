@@ -1,0 +1,90 @@
+---
+- hosts: localhost
+  name: 'SNMP Config: {{ cluster }}'
+  gather_facts: no
+  vars:
+    state: present
+    login: &login
+      hostname: "{{ netapp_hostname }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: "{{ validate_certs }}"
+
+  vars_files:
+  - vars/vars_snmp_config_sandbox.yml
+  collections:
+  - netapp.ontap
+
+  tasks:
+
+  ###
+  # Module-Based: SNMP Configuration
+  ###
+
+  ###
+  # SNMP Community
+  # Note:
+  ###
+
+  - name: Create SNMP community
+    netapp.ontap.na_ontap_snmp:
+      state: "{{ state }}"
+      <<: *login
+
+      community_name: "{{ snmp_com }}"
+      access_control: 'ro'
+
+  ###
+  # System SNMP Location
+  # Note: system node modify -node * -location <location>
+  ###
+
+  - name: Set Location string on each node
+    na_ontap_command:
+      command: "{{ set_loc }}"
+      <<: *login
+
+  ###
+  # SNMP Traphost
+  # Note:
+  ###
+
+  - name: Create SNMP traphost
+    na_ontap_snmp_traphosts:
+      state: "{{ state }}"
+      <<: *login
+
+      ip_address: "{{ snmp_thost }}"
+    ignore_errors: true
+
+
+  ###
+  # firewall testing
+  ###
+
+  - name: Enable firewall and logging on a node
+    na_ontap_firewall_policy:
+      <<: *login
+
+      node: "{{ item }}"
+      enable: enable
+      logging: enable
+
+    loop:
+      - sandbox-01
+      - sandbox-02
+
+
+  - name: create firewall Policy
+    na_ontap_firewall_policy:
+      state: "{{ state }}"
+      <<: *login
+
+      allow_list: "{{ fw_allow_list }}"
+      # allow_list: 192.168.7.0/24,10.16.0.0/16
+      # allow_list: [10.16.0.0/16,192.168.7.0/24]
+
+      policy: pizza
+      service: http
+      vserver: "{{ svm }}"

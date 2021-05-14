@@ -1,0 +1,32 @@
+---
+- name: Create new Active-Directory Domain & Forest
+  hosts: localhost
+  vars_files:
+   - vars_winad.yml
+  gather_facts: false
+  tasks:
+  - name: Add host to Ansible inventory
+    add_host:
+      name: '{{ dc_address }}'
+      ansible_user: .\administrator
+      ansible_password: '{{ lab_password }}'
+      ansible_connection: winrm
+      ansible_winrm_transport: ntlm
+      ansible_winrm_server_cert_validation: ignore
+      ansible_winrm_port: 5986
+
+  - name: Search-only, return list of found updates (if any), log to c:\ansible_wu.txt
+    win_updates:
+     state: searched
+     log_path: c:\ansible_wu.txt
+  - name: install all critical and security updates
+    win_updates:
+     category_names:
+     - CriticalUpdates
+     - SecurityUpdates
+     - UpdateRollups
+     state: installed
+    register: update_result
+  - name: reboot host if required
+    win_reboot:
+    when: update_result.reboot_required

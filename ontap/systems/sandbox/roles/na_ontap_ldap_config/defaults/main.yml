@@ -1,0 +1,15 @@
+---
+license_codes:
+aggrs:
+ports:
+ifgrps:
+vlans:
+Broadcast_Domain_Configuration:
+inters:
+cluster_name: temp
+autonegotiate: true
+flowcontrol: none
+distribution_function: ip
+ifgrp_mode: singlemode
+bcast_ipspace: Default
+mtu: 9000

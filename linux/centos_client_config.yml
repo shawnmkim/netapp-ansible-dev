@@ -1,0 +1,15 @@
+---
+- name: install python3 and pip3
+  hosts: centos-client
+  become: yes
+  become_user: root
+
+  tasks:
+      - name: run dnf update && install
+        raw: "{{ item }}"
+        loop:
+            - sudo dnf -y update
+            - sudo dnf -y install python3-pip
+        become: true
+        ignore_errors: true
+
