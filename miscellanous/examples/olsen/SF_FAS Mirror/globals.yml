@@ -1,0 +1,13 @@
+# These are global default for the volume creation script
+state: "present"
+
+# Section describes the Secondary Defaults
+netapp_svm: "ansiblerepication"
+netapp_aggregate: "aggr_data_01"
+mirrored: "True"
+sf_url: "https://{{ hostname }}/json-rpc/11.0/"
+
+# This is the QOS per volume and on policy
+min: "50"
+max: "35000"
+burst: "45000"

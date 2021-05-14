@@ -1,0 +1,42 @@
+---
+- hosts: localhost
+  gather_facts: false
+
+  collections:
+    - netapp.ontap
+
+  vars:
+    netapp_hostname: "cluster1.demo.netapp.com"
+    netapp_username: "admin"
+    netapp_password: "Netapp1!"
+    volumefile: "volsource.csv"
+
+  tasks:
+  - name: Get data from file {{ volumefile }}
+    read_csv:
+      path:  "{{ volumefile }}"
+    register: uservols
+
+  - name: Running command na_ontap_SVM
+    include_tasks: /playinfra/netapp_ansible_collections_templates/ontap/tasks/na_ontap_svm_task.yml
+    loop: "{{ uservols.list }}"
+    vars:
+      req_svm_name_01 : "{{ item.svm }}"
+      opt_svm_comment_01: "Ansible Managed SVM"
+      opt_svm_root_volume_security_style_01: "unix"
+      opt_svm_root_volume_01: "{{ item.svm }}_root"
+      opt_svm_language_01: "c.utf-8"
+      opt_svm_root_volume_aggregate_01: "cluster1_02_SSD_1"
+
+  - name: Running command na_ontap_volume
+    include_tasks: /playinfra/netapp_ansible_collections_templates/ontap/tasks/na_ontap_volume_task.yml
+    loop: "{{ uservols.list }}"
+    vars:
+      req_volume_name_01: "{{ item.volume }}"
+      req_volume_vserver_01: "{{ item.svm }}"
+      opt_volume_size_01: "12"
+      opt_volume_size_unit_01: "gb"
+      opt_volume_junction_path_01: "/{{ item.volume }}"
+      opt_volume_volume_security_style_01: "unix"
+      opt_volume_aggregate_name_01: "cluster1_02_SSD_1"
+      opt_volume_space_guarantee_01: "none"

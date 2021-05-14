@@ -1,0 +1,208 @@
+# Varibles for ms11p00im-filercdot001 setup & config
+cluster: ontap-cl01
+cluster_aggr: "{{ cluster | replace('-','_') }}"
+# language:  "{{ cluster | replace('-','_') if language is defined else omit }}"
+cluster_mgmt: "{{ netapp_hostname }}"
+netapp_hostname: 192.168.7.210
+netapp_username: admin
+netapp_password: netapp1234    # Comment out to use vars_prompt
+validate_certs: false
+
+# Added to support admin publickey setup via REST API
+ontap_endpoint_url: "https://{{ cluster_mgmt }}/api"
+account_name: admin
+
+# DNS Settings
+dns_domain: example.local
+dns_srvrs: 192.168.7.3
+
+# NTP & Timezone Settings
+time: time.apple.com
+tzone: 'GMT'
+# tzone: 'ETC/GMT'           #  <Area/Location Timezone> - Specified in the Olson format
+# tzone: 'US/Pacific'           #  <Area/Location Timezone> - Specified in the Olson format
+
+# Service Processor Settings
+sp_netmask: 255.255.255.224
+sp_gateway: 10.237.60.65
+
+# SVM Settings
+svm: ontap-vs01
+svm_root: "{{ svm | replace('-','_') }}"
+svm_netmask: 255.255.255.0
+svm_gateway: 192.168.7.1
+svm_network: 192.168.7.0/24
+svm_subnet_ip_ranges: "{{ ['192.168.7.212', '192.168.7.217'] }}"
+
+
+###
+# Role-Based: Standard Config
+###
+
+###
+# Cluster Config
+# Based on if Variables != or == None determins if a section runs.
+# Each variable will take one or more dictonary entries.  Simply omit sections
+# that you don't want to run.  Anotherwords: Empty varibles don't run in NetApp roles
+
+# license_codes: YFIZOMAFXMSMUCKQBPBAAAAAAAAA,ENVNLMAFXMSMUCKQBPBAAAAAAAAA,KYALNGPCCLPKICKQBPBAAAAAAAAA,QFOZJGPCCLPKICKQBPBAAAAAAAAA
+license_codes: QDDSVRRRYVHXCFABGAAAAAAAAAAA,MBXNQRRRYVHXCFABGAAAAAAAAAAA,ANGJKUNFXMSMUCEZFAAAAAAAAAAA,UFTUNUNFXMSMUCEZFAAAAAAAAAAA
+
+disks: # disks module assigns all visiable disks to a node.
+    - "{{ cluster }}-01"
+    - "{{ cluster }}-02"
+
+dns:  # Set DNS for Cluster
+  - { dns_domains: "{{ dns_domain }}", dns_nameservers: "{{ dns_srvrs }}" }
+
+ntp:  # Set NTP Server (requires the cluster to have DNS set)
+  - { server_name: "{{ time }}", version: auto }
+
+aggrs:  # Create one or more Aggregates. (Update role for is_mirrored)
+  - { name: "{{ cluster_aggr }}_01_aggr1", node: "{{ cluster }}-01", disk_count: 40, max_raid: 20, mirror: true }
+  - { name: "{{ cluster_aggr }}_02_aggr1", node: "{{ cluster }}-02", disk_count: 40, max_raid: 20, mirror: true }
+
+ports:  # Set MTU for ports
+  - { node: "{{ cluster }}-01", port: e0d, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-01", port: e0e, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-01", port: e0f, mtu: 1500, flowcontrol: none }
+  # - { node: "{{ cluster }}-01", port: e0g, mtu: 1500, flowcontrol: none }
+  # - { node: "{{ cluster }}-01", port: e3a, mtu: 1500, flowcontrol: none }
+  # - { node: "{{ cluster }}-01", port: e3b, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-02", port: e0d, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-02", port: e0e, mtu: 1500, flowcontrol: none }
+  - { node: "{{ cluster }}-02", port: e0f, mtu: 1500, flowcontrol: none }
+  # - { node: "{{ cluster }}-02", port: e0g, mtu: 1500, flowcontrol: none }
+  # - { node: "{{ cluster }}-02", port: e3a, mtu: 1500, flowcontrol: none }
+  # - { node: "{{ cluster }}-02", port: e3b, mtu: 1500, flowcontrol: none }
+
+bcasts:  # Create Broadcast domains
+  # - { name: nfs_domain, mtu: 1500, ipspace: default, ports: 'ms11p00im-filercdot001-01:e3a,ms11p00im-filercdot001-01:e3b,ms11p00im-filercdot001-01:e0e,ms11p00im-filercdot001-01:e0g,ms11p00im-filercdot001-02:e3a,ms11p00im-filercdot001-02:e3b,ms11p00im-filercdot001-02:e0e,ms11p00im-filercdot001-02:e0g' }
+  # - { name: mgmtSM_domain, mtu: 1500, ipspace: default, ports: 'ms11p00im-filercdot001-01:e0f,ms11p00im-filercdot001-02:e0f' }
+  - { name: nfs_domain, mtu: 1500, ipspace: default,
+      ports: "{{ cluster }}-01:e0d,{{ cluster }}-01:e0e,{{ cluster }}-02:e0d,{{ cluster }}-02:e0e" }
+  # - { name: mgmtSM_domain, mtu: 1500, ipspace: default, ports: '{{ cluster }}-01:e0f,{{ cluster }}-02:e0f' }
+  - { name: mgmtSM_domain, mtu: 1500, ipspace: default,
+      ports: '{{ cluster }}-01:e0f,{{ cluster }}-02:e0f,{{ cluster }}-01:e0c,{{ cluster }}-02:e0c' }
+
+inters: # Create intercluster lifs for SnapMirror.
+  - { name: "{{ cluster }}-01_icl1", address: 192.168.7.213, netmask: "{{ svm_netmask }}", node: "{{ cluster }}-01", port: e0f }
+  - { name: "{{ cluster }}-01_icl2", address: 192.168.7.218, netmask: "{{ svm_netmask }}", node: "{{ cluster }}-02", port: e0f }
+
+
+###
+# Vserver Config
+
+vservers:  # Vservers to create # aggr_list is optional.  If not specified, defaults to all aggregates.
+  - { name: "{{ svm }}", aggr: "{{ cluster_aggr }}_01_aggr1", protocol: nfs, rootvol: "{{ svm_root }}", aggr_list: "{{ cluster_aggr }}_01_aggr1,{{ cluster_aggr }}_02_aggr1" }
+
+
+vserver_dns:  # DNS at the Vserver level
+  - { vserver: "{{ svm }}", dns_domains: "{{ dns_domain }}", dns_nameservers: "{{ dns_srvrs }}" }
+
+lifs:  # interfaces for the Vservers being created
+  # - { name: "{{ svm }}_data1", vserver: "{{ svm }}", node: "{{ cluster }}-01", port: e3a, protocol: nfs, address: 10.9.79.197, netmask: "{{ svm_netmask }}" }
+  # - { name: "{{ svm }}_data2", vserver: "{{ svm }}", node: "{{ cluster }}-01", port: e0e, protocol: nfs, address: 10.9.79.198, netmask: "{{ svm_netmask }}" }
+  # - { name: "{{ svm }}_data3", vserver: "{{ svm }}", node: "{{ cluster }}-01", port: e3b, protocol: nfs, address: 10.9.79.199, netmask: "{{ svm_netmask }}" }
+  # - { name: "{{ svm }}_data4", vserver: "{{ svm }}", node: "{{ cluster }}-01", port: e0g, protocol: nfs, address: 10.9.79.200, netmask: "{{ svm_netmask }}" }
+  # - { name: "{{ svm }}_data5", vserver: "{{ svm }}", node: "{{ cluster }}-02", port: e3a, protocol: nfs, address: 10.9.79.201, netmask: "{{ svm_netmask }}" }
+  # - { name: "{{ svm }}_data6", vserver: "{{ svm }}", node: "{{ cluster }}-02", port: e0e, protocol: nfs, address: 10.9.79.202, netmask: "{{ svm_netmask }}" }
+  # - { name: "{{ svm }}_data7", vserver: "{{ svm }}", node: "{{ cluster }}-02", port: e3b, protocol: nfs, address: 10.9.79.203, netmask: "{{ svm_netmask }}" }
+  # - { name: "{{ svm }}_data8", vserver: "{{ svm }}", node: "{{ cluster }}-02", port: e0g, protocol: nfs, address: 10.9.79.204, netmask: "{{ svm_netmask }}" }
+
+  # - { name: "{{ svm }}_data1", vserver: "{{ svm }}", node: "{{ cluster }}-01", port: e3a, protocol: nfs, address: 10.9.79.197, netmask: "{{ svm_netmask }}" }
+  - { name: "{{ svm }}_data2", vserver: "{{ svm }}", node: "{{ cluster }}-01", port: e0d, protocol: nfs, address: 192.168.7.212, netmask: "{{ svm_netmask }}" }
+  # - { name: "{{ svm }}_data3", vserver: "{{ svm }}", node: "{{ cluster }}-01", port: e3b, protocol: nfs, address: 10.9.79.199, netmask: "{{ svm_netmask }}" }
+  # - { name: "{{ svm }}_data4", vserver: "{{ svm }}", node: "{{ cluster }}-01", port: e0g, protocol: nfs, address: 10.9.79.200, netmask: "{{ svm_netmask }}" }
+  # - { name: "{{ svm }}_data5", vserver: "{{ svm }}", node: "{{ cluster }}-02", port: e3a, protocol: nfs, address: 10.9.79.201, netmask: "{{ svm_netmask }}" }
+  - { name: "{{ svm }}_data6", vserver: "{{ svm }}", node: "{{ cluster }}-02", port: e0d, protocol: nfs, address: 192.168.7.217, netmask: "{{ svm_netmask }}" }
+  # - { name: "{{ svm }}_data7", vserver: "{{ svm }}", node: "{{ cluster }}-02", port: e3b, protocol: nfs, address: 10.9.79.203, netmask: "{{ svm_netmask }}" }
+  # - { name: "{{ svm }}_data8", vserver: "{{ svm }}", node: "{{ cluster }}-02", port: e0g, protocol: nfs, address: 10.9.79.204, netmask: "{{ svm_netmask }}" }
+
+gateway:  # To configure the default route/gateway for the vservers
+  - { vserver: "{{ svm }}", destination: 0.0.0.0/0, gateway: "{{ svm_gateway }}" }
+
+###
+# Non-Role-Based: Standard Config
+###
+
+# Broadcast-domain Management of active ports
+bcd_split_ports:
+  - { origin_bd: Default, new_bd: mgmtSM_domain, ports: '["{{ cluster }}-01:e0c", "{{ cluster }}-02:e0c"]' }
+
+# Service Processor Network Configuration
+#sp_config: # Configure Service Processor network
+sp_config:
+  - { name: "{{ cluster }}-01", address: 10.237.60.68, netmask: "{{ sp_netmask }}", gateway: "{{ sp_gateway }}", node: "{{ cluster }}-01" }
+  - { name: "{{ cluster }}-02", address: 10.237.60.69, netmask: "{{ sp_netmask }}", gateway: "{{ sp_gateway }}", node: "{{ cluster }}-02" }
+
+# Export-Policy Management
+svm_export_policy_name:
+  - { svm: "{{ svm }}", name: 'DCRO' }
+  - { svm: "{{ svm }}", name: 'DC' }
+  - { svm: "{{ svm }}", name: 'Avere' }
+
+export_policy_rules_list:
+  - { name: 'default', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: any, ro_rule: 'any', rw_rule: 'any', super_user_security: 'any' }
+  - { name: 'DCRO', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: nfs, ro_rule: 'any', rw_rule: 'never', super_user_security: 'sys' }
+  - { name: 'DCRO', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: nfs, ro_rule: 'any', rw_rule: 'never', super_user_security: 'none' }
+  - { name: 'DC', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: nfs, ro_rule: 'any', rw_rule: 'any', super_user_security: 'sys' }
+  - { name: 'DC', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: nfs, ro_rule: 'any', rw_rule: 'any', super_user_security: 'none' }
+  - { name: 'Avere', svm: "{{ svm }}", client_match: '10.9.79.0/26', protocol: nfs, ro_rule: 'any', rw_rule: 'any', super_user_security: 'sys' }
+
+# SSH publickey
+users:
+  - { name: admin, app: ssh, auth_meth: publickey, role_name: admin,  }
+
+# ssh_publickey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDoiHB6BsZnBYpF4LM7XkRUVS933Kzu21VXU07OKbBIi97/5XFm3bykMhGR2M3QAAdyUfxIpewARhVmS8b+Eo+5lMSeG+7/JpuPJ+q84QTDsFMiUg5dp3M2bTsVLTCzrHkQUC348LScVF9+xtdFZrO4IH38/sZ5lMeJvtEWGs79IDvx8wljX1+7KywjWEH8aNuyv4qOd2mDS/Bar9Ir94IVAji5DiQiXXrxHt0nXiQid5+YoHeKZnhknF1McpbiIrYg5rT4o3VhV3jVP6WY75lEXWdjq2gj7BuHFDotbBQQeJ5cNvbAQqirZIfVyR8xbfRbS5wqBhL23jg68Y4c8/6j"
+ssh_publickey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDseS4OJJUZQGO1sz8fp3Os/nZUf8cqGk2LKaPokHP+oE9Rt5nEGwVEuYDlRyN4HA/aWkY7rTr6HYhJPqvWFoJ0rkKG85RlhSaqdB7fVLvYuMUnb7p70I7pW+gt34GVoQVQ3tf++JIrerxTfno/hxF3vkoUyiwJULwVJbEpp5zRuIB5moZQXOkoxJPtWOHR3hhoX0trLc1Dgp/tsUf5XLLqo5DzqfZ0BkvpDVNGusEz0v2TBglNrHbHlPl5MOnsMG/H2R1LtE3bp7KgWavytNiA3IjZEkxJz/pP1nzEkhQIx2VvQGS0KWRjLQ3Qz5liUzLWz5XGDXLQpmIBiEdvs8yD/RF/ieU9wCF9IyUvG6eGALcyVp1wimekxvblO3ZTayKNDL6GsubCB06g1J6ZWQIunSeJzpt/xaGzo8go2eMOn2I6X8AEb0ZtT7NlH2c08gYUW6iaC4yXC6YxBQ7YxNmNBj0y4tBa23IRpGPKm32xEr8o5UFWpyi/QIPHioQdYzgJUG8BImsxg9EdD/kH3zKzER6HMFASEfNrBfHeCY1A14z/GaKfebTNlzobSkGbQ+AEroLb7LNqh5PB2KqHxh3uy7wvG6Q4h0HrlFz3DjKJIMNX3Gjaoy6RjTiUCanm9zcegGdJakmnp5tLUWZG3Zo0M+6adgyAI4dwEyLLqHAdbQ== wolftales@gmail.com"
+
+
+# LS Mirrors
+ls_mirrors:
+  # - { aggr: "{{ cluster_aggr }}_01_aggr1", name: "{{ svm_root }}_root_mir1", svm: "{{ svm }}" }
+  # - { aggr: "{{ cluster_aggr }}_02_aggr1", name: "{{ svm_root }}_root_mir2", svm: "{{ svm }}" }
+  - { aggr: "{{ cluster | replace('-','_') }}_02_aggr1", name: "{{ svm | replace('-','_') }}_root_mir1", svm: "{{ svm }}" }
+
+
+###
+# Renaming section
+###
+
+# Rename node section - Ex: cluster-01 to cluster01
+# Naming convention is cluster+instance
+node_names:
+  - { from_name: "{{ cluster }}-01", name: "{{ cluster }}01" }
+  - { from_name: "{{ cluster }}-02", name: "{{ cluster }}02" }
+#  - { from_name: "{{ cluster }}-03", name: "{{ cluster }}03" }
+#  - { from_name: "{{ cluster }}-04", name: "{{ cluster }}04" }
+
+# Rename Aggregates section
+aggr0_names:
+  - { name: 'aggr0_{{ cluster }}_01', rename: "aggr0_{{ cluster_aggr }}01", mirror: true }
+  - { name: 'aggr0_{{ cluster }}_02', rename: "aggr0_{{ cluster_aggr }}02", mirror: true }
+#  - { name: 'aggr0_{{ cluster }}_03', rename: "aggr0_{{ cluster }}03" }
+#  - { name: 'aggr0_{{ cluster }}_04', rename: "aggr0_{{ cluster }}04" }
+
+aggr_names:
+  - { name: 'aggr0_{{ cluster }}_01', rename: "aggr1_{{ cluster_aggr }}01" }
+  - { name: 'aggr0_{{ cluster }}_02', rename: "aggr1_{{ cluster_aggr }}02" }
+
+
+# Rename root volume section
+#vol0_list:
+#  - { name: 'vol0', rename: "{{ cluster }}_01_root", vserver: "{{ cluster }}" }
+#  - { name: "{{ cluster }}_02_vol0", rename: "{{ cluster }}_02_root", vserver: "{{ cluster }}" }
+#  - { name: "{{ cluster }}_03_vol0", rename: "{{ cluster }}_03_root", vserver: "{{ cluster }}" }
+#  - { name: "{{ cluster }}_04_vol0", rename: "{{ cluster }}_04_root", vserver: "{{ cluster }}" }
+
+# Rename lifs section
+lif_rename:
+  - { svm: 'Cluster', lif: "{{ cluster }}-01_clus1", newname: "{{ cluster }}01_clus1" }
+  - { svm: 'Cluster', lif: "{{ cluster }}-01_clus2", newname: "{{ cluster }}01_clus2" }
+  - { svm: 'Cluster', lif: "{{ cluster }}-02_clus1", newname: "{{ cluster }}01_clus1" }
+  - { svm: 'Cluster', lif: "{{ cluster }}-02_clus2", newname: "{{ cluster }}01_clus2" }
+  - { svm: "{{ cluster }}", lif: "cluster_mgmt", newname: "{{ cluster }}_mgmt" }
+  - { svm: "{{ cluster }}", lif: "{{ cluster }}-01_mgmt1", newname: "{{ cluster }}01_mgmt1" }
+  - { svm: "{{ cluster }}", lif: "{{ cluster }}-01_mgmt_auto", newname: "{{ cluster }}01_mgmt1" }
+  - { svm: "{{ cluster }}", lif: "{{ cluster }}-02_mgmt1", newname: "{{ cluster }}02_mgmt2" }

@@ -1,0 +1,166 @@
+################################################################################
+#
+#   Author      :   David Blackwell
+#   Date        :   18 Feb 21
+#
+#   Description :   Workflow to create load share mirrors.
+#
+#   Dependencies: netapp.ontap collection
+#
+################################################################################
+---
+- hosts:                localhost
+  name:                 Setup ONTAP
+  gather_facts:         false
+  collections:
+    -                   ansible.builtin
+    -                   netapp.ontap
+  vars:
+    login: &login
+      hostname:         "{{ netapp_hostname }}"
+      username:         "{{ netapp_username }}"
+      password:         "{{ netapp_password }}"
+      https:            "{{ netapp_https }}"
+      validate_certs:   "{{ netapp_validate_certs }}"
+    state:              present
+
+    aggrs: "{{ lookup('file','aggrs.json') | from_json }}"
+    nodes: "{{ lookup('file','nodes.json') | from_json }}"
+
+    # Other Variables that have to be declared but have no default
+    vserver:
+    aggr_list: []
+    node_list: []
+
+  pre_tasks:
+    #---------------------------------------------------------------------------
+    # PRE VALIDATION STEPS:
+    #  - Attempting to mimic as much of WFA controls as possible
+    #  - This performs the minimum possible validation against inputs
+    #---------------------------------------------------------------------------
+  - name:                       "Asserting mandatory storage details are defined properly"
+    assert:
+      that:
+        -                       netapp_hostname is defined
+        -                       netapp_username is defined
+        -                       netapp_password is defined
+        -                       netapp_https is defined
+        -                       netapp_validate_certs is defined
+        -                       vserver is defined
+      fail_msg:                 "One or more variables are missing from submission"
+
+
+  tasks:
+  - name:                       Collect information about Nodes and Aggregates
+    na_ontap_info:
+      gather_subset:            aggregate_info,cluster_node_info,vserver_info
+      <<: *login
+    register:                   netapp_info
+
+  - name:                       Set cluster name
+    set_fact:
+      cluster:                  "{{ item }}"
+    with_items:                 "{{ netapp_info.ontap_info.vserver_info}}"
+    when:                       netapp_info.ontap_info.vserver_info[item].comment == 'The administrative vserver.'
+
+  - name:                       Set vserver root vol name
+    set_fact:
+      root_vol:                 "{{ netapp_info.ontap_info.vserver_info[item].root_volume }}"
+    with_items:                 "{{ netapp_info.ontap_info.vserver_info}}"
+    when:                       item == vserver
+
+  - name:                       Create Node list
+    set_fact:
+      node_list:                "{{ node_list }} + ['{{ netapp_info.ontap_info.cluster_node_info[item].node_name }}']"
+    with_items:                 "{{ netapp_info.ontap_info.cluster_node_info }}"
+
+  - block:
+    - name:                     Create Aggregate list
+      set_fact:
+        aggr_list:              "{{
+                                    aggr_list |
+                                        default({}) |
+                                            combine({ item.0: (aggr_list[item.0] if aggr_list[item.0] is defined else {}) |
+                                                 combine ({ item.1: netapp_info.ontap_info.aggregate_info[item.1].aggr_space_attributes.size_available }) })
+                                 }}"
+      loop:                      "{{ node_list | product(netapp_info.ontap_info.aggregate_info) | list }}"
+      when:
+        -                         netapp_info.ontap_info.aggregate_info[item.1].aggr_ownership_attributes.home_name == item.0
+        -                         netapp_info.ontap_info.aggregate_info[item.1].aggr_raid_attributes.is_root_aggregate != 'true'
+
+# Raw Aggrs
+  - debug:
+      msg:
+        -           "{{ aggr_list }}"
+
+
+# Biggest Aggrs
+  - set_fact:
+      biggest_aggr_list:      "{{ biggest_aggr_list | default([]) + [{ 'aggr':(item.value | list | sort | first) }] }}"
+    with_dict:           "{{ aggr_list }}"
+
+
+  - debug:
+      msg:
+        -           "{{ biggest_aggr_list  }}"
+
+  - name: ..... create destination LS Volume
+    na_ontap_volume:
+      hostname: "{{ netapp_hostname }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: false
+      state: present
+      name: "{{ vserver }}_ls_{{ count }}"
+      aggregate_name: "{{ item.aggr }}"
+      size: 1
+      size_unit: gb
+      type: DP
+      vserver: "{{ vserver }}"
+    with_items:
+      "{{ biggest_aggr_list }}"
+    loop_control:
+      index_var: count
+    tags: create
+
+  - name: ..... create LS Mirror
+    na_ontap_snapmirror:
+      hostname: "{{ netapp_hostname }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: false
+      state: present
+      source_volume: "{{ root_vol }}"
+      source_vserver: "{{ vserver }}"
+      destination_volume: "{{ vserver }}_ls_{{ count }}"
+      destination_vserver: "{{ vserver }}"
+      relationship_type: load_sharing
+      schedule: "5min"
+    with_items:
+      "{{ biggest_aggr_list }}"
+    loop_control:
+      index_var: count
+
+  - name: ..... initialize LS mirrors
+    na_ontap_command:
+      hostname: "{{ netapp_hostname }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: false
+      command: ['snapmirror', 'initialize', '-source-path', '{{ cluster }}://{{ vserver }}/{{ root_vol }}', '-destination-path', '{{ cluster }}://{{ vserver }}/{{ vserver }}_ls_{{ count }}' ]
+    with_items:
+      "{{ biggest_aggr_list}}"
+    loop_control:
+      index_var: count
+
+  - name: ..... execute LS updates
+    na_ontap_command:
+      hostname: "{{ netapp_hostname }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: false
+      command: ['snapmirror', 'update-ls-set', '-source-path', '{{ cluster }}://{{ vserver }}/{{ root_vol }}' ]

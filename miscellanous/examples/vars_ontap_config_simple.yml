@@ -22,6 +22,10 @@ netapp_username: admin
 netapp_password: netapp1234     # Comment out to use vars_prompt
 validate_certs: false           # Set the default
 
+# Added to support ONTAP REST API URI calls
+ontap_endpoint_url: "https://{{ cluster_mgmt }}/api"
+account_name: admin
+
 # DNS Services Settings
 dns_domain: example.local
 dns_srvrs: 192.168.7.3

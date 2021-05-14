@@ -1,0 +1,381 @@
+---
+- hosts: localhost
+  name: Destination Cluster Config
+  gather_facts: no
+  vars:
+    state: present
+    login: &login
+      hostname: "{{ netapp_hostname }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: "{{ validate_certs }}"
+  # vars_prompt:  # For NetApp Admin Credentials
+  #   - name: netapp_username
+  #     prompt: NetApp 'admin'
+  #   - name: netapp_password
+  #     prompt: NetApp 'admin' password
+  #     secret: true
+  vars_files:
+  - vars_cluster_config.yml
+  collections:
+  - netapp.ontap
+
+  tasks:
+
+  ###
+  # Network: Broadcast-domain split
+  ###
+
+  - name: Manage Active Ansible MGMT network interface
+    na_ontap_broadcast_domain:
+      state: present
+      <<: *login
+      from_name: "{{ item.origin_bd }}"
+      name: "{{ item.new_bd }}"
+      mtu: '1500'
+      ipspace: Default
+      ports: "{{ item.ports }}"
+    loop: "{{ bcd_split_ports }}"
+
+  ###
+  # Role: Cluster Configuration
+  # Note: aggr task modified to support sync-mirror: is_mirrored: '{{ mirror }}'
+  ###
+
+  - include_role:
+      name: na_ontap_cluster_config_v2
+
+  ###
+  # Network: Subnet Configuration
+  # Note: Disabled & not Working
+  ###
+
+  # - name: create subnet
+  #   na_ontap_net_subnet:
+  #     <<: *login
+  #     state: "{{ state }}"
+  #     subnet: "{{ svm_network }}"
+  #     name: subnet1
+  #     # ip_ranges: [ '10.9.79.197-10.9.79.204' ]
+  #     ip_ranges: "{{ svm_subnet_ip_ranges }}"
+  #     gateway: "{{ svm_gateway }}"
+  #     ipspace: Default
+  #     broadcast_domain: nfs_domain
+
+  # - name: Create interface
+  #   na_ontap_interface:
+  #     <<: *login
+  #     state: "{{ state }}"
+  #     interface_name: "{{ item.name }}"
+  #     force_subnet_association: true
+  #     vserver: "{{ svm }}"
+  #   loop: "{{ lifs }}"
+
+  ###
+  # Role: Vserver Configuration
+  # Note: rootvol added to vserver create task becuase of - in svm name
+  ###
+
+  - include_role:
+      name: na_ontap_vserver_create_v2
+
+  #     rootvol: "{{ item.name | replace('-','_') }}"
+
+  ###
+  # Mirror aggregates & vserver_root
+  ###
+
+  # - name: 'Mirror System Aggregates'
+  #   na_ontap_command:
+  #     <<: *login
+  #
+  #     command:        [ 'storage', 'aggregate', 'mirror',
+  #                       '-aggregate', 'aggr0_{{ cluster_aggr }}_01' ]
+  #
+  # - name: 'Mirror System Aggregates'
+  #   na_ontap_command:
+  #     <<: *login
+  #
+  #     command:        [ 'storage', 'aggregate', 'mirror',
+  #                       '-aggregate', 'aggr0_{{ cluster_aggr }}_02' ]
+
+
+  ###
+  # timezone
+  ###
+
+  - name: 'Set cluster timezone {{ tzone }}'
+    na_ontap_command:
+      <<: *login
+
+      command:        [ 'cluster', 'date', 'modify',
+                        '-timezone', "{{ tzone }}" ]
+
+  ###
+  # Autosupport: Configuration
+  ###
+
+  # - name: Enable autosupport
+  #   na_ontap_autosupport:
+  #     <<: *login
+  #     state: "{{ state }}"
+  #     node_name: "{{ item.node }}"
+  #     transport: smtp
+  #     hostname_in_subject: true
+  #     from_address: "{{ cluster }}@apple.com"
+  #     noteto: abc@def.com,def@ghi.com
+  #     to_addresses: isgms@group.apple.com
+  #     partner_addresses: appleasup4gw@group.apple.com
+  #     mail_hosts: bz.apple.com
+  #   loop: "{{ aggrs }}"
+
+
+   ###
+   # Service Processors: Configure Network
+   ###
+
+  # - name: Modify Service Processor Network
+  #   na_ontap_service_processor_network:
+  #     <<: *login
+  #     state: "{{ state }}"
+  #     address_type: ipv4
+  #     is_enabled: true
+  #     dhcp: none
+  #     node: "{{ item.node }}"
+  #     gateway_ip_address: "{{ svm_gateway }}"
+  #     ip_address: "{{ item.address }}"
+  #     netmask: "{{ item.svm_netmask }}"
+  #   loop: "{{ sp_config }}"
+
+  ###
+  # Snapshots: Adjust 'default' policy
+  ###
+
+  - name: Modify 'default' Snapshot policy
+    na_ontap_snapshot_policy:
+      <<: *login
+      state: "{{ state }}"
+      name: default
+      schedule: weekly
+      count: 0
+      enabled: True
+
+
+  ###
+  # Schedule: Create 'default' policy
+  ###
+
+  - name: Create Job Schedule for every minute
+    na_ontap_job_schedule:
+      <<: *login
+      state: "{{ state }}"
+      name: 1min
+      job_minutes: -1
+
+
+  ###
+  # LS Mirror: Manage vserver protection
+  ###
+
+  # SnapMirror Configuration
+
+  - name: Create Destination Volume
+    na_ontap_volume:
+      <<: *login
+      state: "{{ state }}"
+      name: "{{ item.name | replace('-','_') }}"
+      aggregate_name: "{{ item.aggr | replace('-','_') }}"
+      size: 1
+      size_unit: gb
+      type: DP
+      space_guarantee: "none"
+      vserver: "{{ item.svm }}"
+      wait_for_completion: True
+    loop: "{{ ls_mirrors }}"
+
+  # SnapMirror Configuration on Destination
+
+  - name: "Create a SnapMirror LS relationship for {{ svm }}"
+    na_ontap_snapmirror:
+      <<: *login
+      state: "{{ state }}"
+      source_vserver: "{{ item.svm }}"
+      source_volume: "{{ svm | replace('-','_') }}_root"
+      destination_volume: "{{ item.name | replace('-','_') }}"
+      destination_vserver: "{{ item.svm }}"
+      relationship_type: load_sharing
+      schedule: "5min"
+      initialize: True
+    loop: "{{ ls_mirrors }}"
+
+
+  - name: ..... initialize LS mirrors
+    na_ontap_command:
+      <<: *login
+      # privilege: 'advanced'
+      command:       ['snapmirror', 'initialize', '-source-path',
+                      '{{ cluster }}://{{ svm }}/{{ svm_root }}_root', '-destination-path',
+                      '{{ cluster }}://{{ svm }}/{{ item.name }}' ]
+
+    loop: "{{ ls_mirrors }}"
+
+  - name: ..... execute LS updates
+    na_ontap_command:
+      <<: *login
+      # privilege: 'advanced'
+
+      command:       ['snapmirror', 'update-ls-set', '-source-path',
+                      '{{ cluster }}://{{ svm }}/{{ svm_root }}_root' ]
+
+
+  ###
+  # SSH: Manage SSH access
+  ###
+
+  - name: 'ONTAP: Get Cluster Admin SVM Owner UUID'
+    uri:
+      method: GET
+      url: "{{ ontap_endpoint_url }}/security/accounts?name={{ account_name }}"
+      return_content: yes
+      headers:
+        accept: application/json
+      url_username: "{{ netapp_username }}"
+      url_password: "{{ netapp_password }}"
+      validate_certs: false
+      force_basic_auth: yes
+    register: json_response
+  # - debug:
+  #     var: json_response
+
+  - name: 'ONTAP: Set Owner UUID'
+    set_fact:
+      owner_uuid:  "{{ item.owner.uuid }}"
+    loop:   "{{ json_response.json.records }}"
+    when:
+      - item.owner.name == '{{ cluster }}'
+  # - debug:
+  #     var: owner_uuid
+
+  - name: 'ONTAP: Set Cluster {{ account_name }} publickey auth_method'
+    uri:
+      method: PATCH
+      url: "{{ ontap_endpoint_url }}/security/accounts/{{ owner_uuid }}/{{ account_name }}"
+      return_content: yes
+      body: "{{ lookup('file', 'login_applications.json') }}"
+      body_format: json
+      headers:
+        Accept: application/json
+      status_code:      200
+      url_username: "{{ netapp_username }}"
+      url_password: "{{ netapp_password }}"
+      validate_certs: false
+      force_basic_auth: yes
+    register: json_response
+
+  - name: 'ONTAP: Create Cluster {{ account_name }} publickey'
+    uri:
+      method: POST
+      url: "{{ ontap_endpoint_url }}/security/authentication/publickeys"
+      return_content: yes
+      body:
+        account:
+          name: admin
+        comment: aWkY7rTr6HYhJPqvWFoJ0rkKG85RlhSaqdB7fVLvYuMUnb7p70I7pW
+        index: 0
+        owner:
+          name: "{{ cluster }}"
+          uuid: "{{ owner_uuid }}"
+        public_key: "{{ ssh_publickey }}"
+      body_format: json
+      force_basic_auth: yes
+      validate_certs:   false
+      url_username: "{{ netapp_username }}"
+      url_password: "{{ netapp_password }}"
+      headers:
+        Accept: application/json
+      status_code:      201
+    register: json_response
+
+
+  ###
+  # Export-Policies: Create and Manage
+  ###
+
+  - name: 'Remove default Export-policy entry: RO = ALL'
+    na_ontap_export_policy_rule:
+      state: absent
+      policy_name: default
+      vserver: "{{ svm }}"
+      rule_index: "{{ item.rule_index | default(1) }}"
+      <<: *login
+
+  - name: Create SVM Export-policy
+    na_ontap_export_policy:
+      state: "{{ state }}"
+      name: "{{ item.name }}"
+      vserver: "{{ item.svm }}"
+      <<: *login
+    loop: "{{ svm_export_policy_name }}"
+
+  - name: Setup "Default" and SVM Export-policies
+    na_ontap_export_policy_rule:
+      state: "{{ state }}"
+      policy_name: "{{ item.name }}"
+      vserver: "{{ item.svm }}"
+      client_match: "{{ item.client_match }}"
+      protocol: "{{ item.protocol }}"
+      ro_rule: "{{ item.ro_rule }}"
+      rw_rule: "{{ item.rw_rule }}"
+      rule_index: "{{ item.rule_index | default(omit)}}"
+      super_user_security: "{{ item.super_user_security }}"
+      <<: *login
+    loop: "{{ export_policy_rules_list }}"
+
+
+  ###
+  # Log Forwarding: Configuration
+  ###
+  - name: Create log forwarding destination
+    na_ontap_command:
+      <<: *login
+      return_dict: yes
+      command:        [ 'cluster', 'log-forwarding',
+                        'create', '-destination', '17.142.199.141',
+                        '-facility', 'user']
+
+  - name: Create event destination
+    na_ontap_command:
+      <<: *login
+      return_dict: yes
+      command:        [ 'event', 'notification', 'destination',
+                        'create', '-name', 'splunk',
+                        '-syslog', '17.142.199.141']
+
+  ###
+  # Security: Manage Weak Ciphers
+  # Note: This requires a reboot to go into affect
+  # advanced privilege mode
+  # 'security config show & security config status show'
+  ###
+
+  - name: 'Disable all but TLSv1.2 and strong ciphers'
+    na_ontap_command:
+      <<: *login
+      privilege: 'advanced'
+
+      command:        [ 'security', 'config', 'modify','-interface', 'SSL',
+                        '-supported-protocols', 'TLSv1.2', '-supported-ciphers',
+                        'AES:!LOW:!MEDIUM:!aNULL:!EXP:!eNULL:!3DES' ]
+
+  ###
+  # Statistics: Enable client-stats
+  ###
+
+  - name: 'Enable -client-stats for statistics'
+    na_ontap_command:
+      <<: *login
+      privilege: 'advanced'
+
+      command:        [ 'statistics', 'settings', 'modify',
+                        '-client-stats', 'enable' ]

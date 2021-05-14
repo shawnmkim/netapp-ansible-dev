@@ -1,0 +1,24 @@
+# this file can be copied and updated for repeated use. 
+# Database Server name Basis for Account, Volumes, QOS Group, Host Access group names
+databaseservername: "pg-server01-db"
+serverdomain: "mwlab.pub"
+
+# Database volume, log, Bin volume count and size, 0 volume count will not create volumes of that type qos defaults are in globals
+db_size_gb: "10"
+log_size_gb: "5"
+bin_size_gb: "1"
+data_lun_count: 4 
+log_lun_count: 1
+bin_lun_count: 1 
+
+# Target Secret to connect to Volumes and state if == absent all volumes will be deleed
+secret: "ThIsIs$eCrEt"
+
+# Multiple IQNs can be specified or this can be altered based on the host type
+hostIQN: 
+  - IQN: "iqn.1994-05.com.redhat:{{ databaseservername }}.{{ serverdomain }}"
+
+# Arrays of data for Volume creation
+data_volume: {volname: "{{ databaseservername }}-data", count: "{{ data_lun_count }}",size: "{{ db_size_gb }}"}
+log_volume: {volname: "{{ databaseservername }}-log", count: "{{ log_lun_count }}",size: "{{ log_size_gb }}"}
+bin_volume: {volname: "{{ databaseservername }}-bin", count: "{{ bin_lun_count }}",size: "{{ db_size_gb }}"} 

@@ -1,0 +1,92 @@
+---
+- hosts: localhost
+  name: Renaming: Standard Naming
+  gather_facts: no
+  vars:
+    state: present
+    login: &login
+      hostname: "{{ netapp_hostname }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: "{{ validate_certs }}"
+  vars_files:
+  - vars_cluster_config.yml
+  # vars_prompt:  # For Administrator Credentials if using
+  #   - name: admin_user_name
+  #     prompt: domain admin (enter if skipped)
+  #   - name: admin_password
+  #     prompt: domain admin password (enter if skipped)
+
+  collections:
+  - netapp.ontap
+
+  tasks:
+
+  ###
+  # Renaming Section
+  # Once renaming is done it will break the current Day 0 / 1 Ansible playbook
+  ###
+
+  # Node naming standards - Ex: cluster-01 to cluster01
+  # Naming convention is cluster+instance
+
+  - name: rename node
+    na_ontap_node:
+      from_name: "{{ item.from_name }}"
+      name: "{{ item.name }}"
+      <<: *login
+    loop: "{{ node_names }}"
+
+
+# aggr0 naming Ex: aggr0_cluster-01 to aggr0_cluster01
+# Standardize root aggergate names based on system naming standards
+
+- name: rename root aggregates
+  na_ontap_aggregate:
+    state: "{{ state }}"
+    service_state: online
+    from_name: "{{ item.name }}"
+    name: "{{ item.rename }}"
+    <<: *login
+  loop: "{{ aggr0_names }}"
+
+# Data Aggregate naming Ex: aggr0_cluster-01 to aggr0_cluster01
+# Standardize data aggergate names based on system naming standards
+
+- name: rename data Aggregates
+  na_ontap_aggregate:
+    state: "{{ state }}"
+    service_state: online
+    from_name: "{{ item.name }}"
+    name: "{{ item.rename }}"
+    <<: *login
+  loop: "{{ aggr_names }}"
+
+
+  # # vol0 naming Ex: vol0_cluster_01 to vol0_cluster01
+  # # Standardize root volume names based on system naming standards
+  #
+  # - name: rename root volumes
+  #   na_ontap_volume:
+  #     state: "{{ state }}"
+  #     from_name: "{{ item.name }}"
+  #     name: "{{ item.rename }}"
+  #     vserver: "{{ item.vserver }}"
+  #     <<: *login
+  #   loop: "{{ vol0_list }}"
+
+
+  # Network naming Ex: cluster_node_name to cluster01_name
+  # Standardize network interface names based on system naming standards
+
+  - name: 'Renaming Network lifs: {{ item.lif }}'
+    na_ontap_command:
+      <<: *login
+
+      command:        [ 'network', 'interface', 'rename',
+                        '-vserver', "{{ item.svm }}", '-lif',
+                        "{{ item.lif }}", '-newname',
+                        "{{ item.newname }}" ]
+
+    loop: "{{ lif_rename }}"

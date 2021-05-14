@@ -1,0 +1,170 @@
+---
+# Task for netapp_cluster_config 
+- name: Create Aggregates
+  na_ontap_aggregate:
+    state: present
+    service_state: online
+    name: '{{ item.name }}'
+    nodes: '{{ item.node }}'
+    disk_count: '{{ item.disk_count }}'
+    raid_size: '{{ item.max_raid }}'
+    hostname: '{{ hostname }}'
+    username: '{{ username }}'
+    password: '{{ password }}'
+    ontapi: '{{ netapp.ontap_info.ontap_version }}'
+    https: true
+    validate_certs: false
+  with_items: '{{ Aggregates_Setup }}'
+  when: Aggregates_Setup is defined and Aggregates_Setup != None
+
+- name: Remove ports from Default broadcast domain
+  na_ontap_broadcast_domain_ports:
+    state: absent
+    broadcast_domain: Default
+    ports: '{{ item.node }}:{{ item.port }}'
+    hostname: '{{ hostname }}'
+    username: '{{ username }}'
+    password: '{{ password }}'
+    ontapi: '{{ netapp.ontap_info.ontap_version }}'
+    https: true
+    validate_certs: false
+  with_items: '{{ Network_Port_Setup }}'
+  when: Network_Port_Setup is defined and Network_Port_Setup != None
+
+- name: Create Interface Group
+  na_ontap_net_ifgrp:
+    state: present
+    distribution_function: '{{ distribution_function }}'
+    name: '{{ item.name }}'
+    ports: '{{ item.ports }}'
+    mode: '{{ item.mode if item.mode is defined else ifgrp_mode }}'
+    node: '{{ item.node}}'
+    username: '{{ username }}'
+    password: '{{ password }}'
+    hostname: '{{ hostname }}'
+    ontapi: '{{ netapp.ontap_info.ontap_version }}'
+    https: true
+    validate_certs: false
+  with_items: '{{ IF_Group_Configuration  }}'
+  when: IF_Group_Configuration is defined and IF_Group_Configuration != None
+  register: ifgrpstatus
+
+- name: Modify Net Port
+  na_ontap_net_port:
+    state: present
+    node: '{{ item.node }}'
+    port: '{{ item.name }}'
+    mtu: '{{ item.mtu }}'
+    username: '{{ username }}'
+    password: '{{ password }}'
+    hostname: '{{ hostname }}'
+    ontapi: '{{ netapp.ontap_info.ontap_version }}'
+    https: true
+    validate_certs: false
+  with_items: '{{ IF_Group_Configuration }}'
+  when: IF_Group_Configuration is defined and IF_Group_Configuration != None
+  register: ifgrpportstatus
+
+- name: Wait 30 seconds for IFGRP configuration
+  pause:
+    seconds: 5
+  when: ifgrpstatus.changed or ifgrpportstatus.changed
+
+- name: Add ports to Default broadcast domain
+  na_ontap_broadcast_domain_ports:
+    state: present
+    broadcast_domain: Default
+    ports: '{{ item.node }}:{{ item.name }}'
+    hostname: '{{ hostname }}'
+    username: '{{ username }}'
+    password: '{{ password }}'
+    ontapi: '{{ netapp.ontap_info.ontap_version }}'
+    https: true
+    validate_certs: false
+  with_items: '{{ IF_Group_Configuration  }}'
+  when: IF_Group_Configuration is defined and IF_Group_Configuration != None
+
+- name: Create VLAN
+  na_ontap_net_vlan:
+    state: present
+    vlanid: '{{ item.id }}'
+    node: '{{ item.node }}'
+    parent_interface: '{{ item.port }}'
+    username: '{{ username }}'
+    password: '{{ password }}'
+    hostname: '{{ hostname }}'
+    ontapi: '{{ netapp.ontap_info.ontap_version }}'
+    https: true
+    validate_certs: false
+  with_items: '{{ VLAN_Configuration }}'
+  when: VLAN_Configuration is defined and VLAN_Configuration != None
+
+- name: Setup Autosupport
+  na_ontap_autosupport:
+    state: present
+    username: '{{ username }}'
+    password: '{{ password }}'
+    hostname: '{{ hostname }}'
+    node_name: '{{ item.node }}'
+    ontapi: '{{ netapp.ontap_info.ontap_version }}'
+    https: true
+    proxy_url: '{{ item.proxy_url }}'
+    transport: '{{ item.transport }}'
+    validate_certs: false
+  with_items: '{{ Setup_Autosupport }}'
+  when: Setup_Autosupport is defined and Setup_Autosupport != None
+
+- name: Setup Service Processor (SP CONFIG)
+  na_ontap_service_processor_network:
+    state: present
+    username: '{{ username }}'
+    password: '{{ password }}'
+    hostname: '{{ hostname }}'
+    node: '{{ item.node }}'
+    address_type: ipv4
+    is_enabled: true
+    ip_address: '{{ item.ip_address }}'
+    gateway_ip_address: '{{ item.gateway_ip_address }}'
+    netmask: '{{ item.netmask }}'
+    validate_certs: false
+  with_items: '{{ SP_Configuration }}'
+  when: SP_Configuration is defined and SP_Configuration != None
+
+
+
+- name: Setup LDAP Config (LDAP CONFIG)
+  na_ontap_ldap:
+    state: present
+    username: '{{ username }}'
+    password: '{{ password }}'
+    hostname: '{{ hostname }}'
+    vserver: '{{ item.svm }}'
+  with_items: '{{ LDAP_Configuration }}'
+  when: LDAP_Configuration is defined and LDAP_Configuration != None
+
+- name: Setup LDAP Client Config (LDAP CLIENT CONFIG)
+  na_ontap_ldap_client:
+    state: present
+    username: '{{ username }}'
+    password: '{{ password }}'
+    hostname: '{{ hostname }}'
+    vserver: '{{ item.svm }}'
+    name: '{{ item.config_name }}'
+    ldap_servers: '{{ item.ldapserver }}
+    base_dn: '{{ item.basedn }}'
+    schema: '{{ item.schema }}'
+    use_start_tls: yes
+  with_items: '{{ LDAP_Configuration }}'
+  when: LDAP_Configuration is defined and LDAP_Configuration != None
+
+- name: Modify LDAP Client Config (Set User, Group DN)
+  na_ontap_command:
+    username: '{{ username }}'
+    password: '{{ password }}'
+    hostname: '{{ hostname }}'
+    ontapi: '{{ netapp.ontap_info.ontap_version }}'
+    https: true
+    validate_certs: false
+    command: '{{ item.command }}'
+  with_items: '{{ LDAP_Adv_Config }}'
+  when: LDAP_Adv_Config is defined and LDAP_Adv_Config != None

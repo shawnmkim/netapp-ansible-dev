@@ -1,0 +1,46 @@
+##########################################################################
+#    Title : Synopsys cDOT setup                                         #       
+#    Developed by: Siva Murugesan, NetApp                                # 
+#    Notes:  Setup cDOT environment for Synopsys, Sunnyvale              # 
+#            Please reach out to NetApp Team for any further queries.    #
+#
+##########################################################################
+
+# Cluster Name
+cluster_name: cluster1
+
+# Cluster Management address
+netapp_hostname: 192.168.0.101
+
+# Cluster default login
+netapp_username: "admin"
+
+# Cluster password
+netapp_password: "Netapp1!"
+
+# Aggregate Setup
+
+Aggregates_Setup:
+  - { name: cluster101_nvme_aggr1, node: cluster1-01, disk_count: 5, max_raid: 22 }
+  - { name: cluster102_nvme_aggr1, node: cluster1-02, disk_count: 5, max_raid: 22 }
+
+Network_Port_Setup:
+  - { node: cluster1-01, port: e0d, mtu: 1500 }
+  - { node: cluster1-01, port: e0e, mtu: 1500 }
+  - { node: cluster1-02, port: e0d, mtu: 1500 }
+  - { node: cluster1-02, port: e0e, mtu: 1500 }
+
+IF_Group_Configuration: 
+  - { name: a0a, mtu: 1500, ports: 'e0d,e0e', node: cluster1-01}
+  - { name: a0a, mtu: 1500, ports: 'e0d,e0e', node: cluster1-02}
+
+SP_Configuration: 
+  - { ip_address: 10.1.1.1, netmask: 255.255.255.0, gateway_ip_address: 10.1.1.254, node: cluster1-01}
+  - { ip_address: 10.1.1.2, netmask: 255.255.255.0, gateway_ip_address: 10.1.1.253, node: cluster1-02}
+
+LDAP_Configuration: 
+  - { svm: 'us01cmflex01vs1', config_name: 'synopsys-ldap', base_dn:'dc=sysnopsys,dc=com', ldapserver: '10.15.10.79', schema: 'RFC-2307'}
+
+LDAP_Adv_Config:
+  - { command: 'ldap client modify modify -vserver us01cmflex01vs1 -client-config synopsys-ldap -ad-domain internal.synopsys.com, -user-dn ou=users,dc=global,dc=synopsys,dc=com, -group-dn ou=group,dc=global,dc=sysnopsys,dc=com -net-group ou=netgroup,dc=us01,dc=sysnopsys,dc=com'}
+

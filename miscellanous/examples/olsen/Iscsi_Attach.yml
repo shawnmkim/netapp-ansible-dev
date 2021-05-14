@@ -1,0 +1,208 @@
+---
+- name: Attach Iscsi luns to Host
+  hosts: localhost
+  gather_facts: false
+  
+  vars_files:
+      - 'sfsecret.yml' 
+
+  vars:
+    - dbservername: "mspdb01"
+    - accountid: 49
+      sf_url: "https://10.26.69.178/json-rpc/11.0/"
+      sf_svip: "10.230.0.186"
+      state: "present"
+      hostdrivecfg:
+       - { name: "pgdata01", devices: "/dev/dm-2,/dev/dm-3,/dev/dm-4,/dev/dm-5,/dev/dm-6,/dev/dm-7,/dev/dm-8,/dev/dm-9"}
+       - { name: "pglog01", devices: "/dev/dm-10"}
+       - { name: "pgbin01", devices: "/dev/dm-11"}
+      
+  tasks:
+   - name: yum update
+     delegate_to: "{{ dbservername }}"
+     package: 
+       name: "{{ item }}"
+       state: latest
+       use: yum
+     become: yes
+     with_items:
+       - "iscsi-initiator-utils"
+       - "device-mapper-multipath"
+       - "hdparm"
+
+   - name: create udev trigger file
+     delegate_to: "{{ dbservername }}"
+     become: yes
+     file:
+       path: /etc/udev/rules.d/99-solidfire.rules
+       state: touch
+
+   - name: Create udev rules Config file
+     delegate_to: "{{ dbservername }}"
+     become: yes
+     copy:
+       dest: /lib/udev/rules.d/99-solidfire.rules
+       content: |
+         ACTION=="add|change", \
+         KERNEL=="sd[a-z]", \
+         ATTRS{vendor}=="SolidFir ", \
+         ATTR{queue/scheduler}="noop", \
+         ATTR{queue/add_random}="0", \
+         ATTR{queue/rq_affinity}="2", \
+         ATTR{queue/nr_requests}="1024", \
+         ATTR{queue/max_sectors_kb}="2048", \
+         RUN+="/sbin/hdparm -Q <Queue Depth> /dev/%k"
+
+   - name: run udev command
+     delegate_to: "{{ dbservername }}"
+     become: yes
+     command: " udevadm trigger"
+
+   - name: Create Multipath Config file
+     delegate_to: "{{ dbservername }}"
+     become: yes
+     copy:
+       dest: /etc/multipath.conf
+       content: |
+         # This is a basic configuration file with some examples, for device mapper
+         # multipath.
+         
+         ## Use user friendly names, instead of using WWIDs as names. defaults {
+         user_friendly_names yes
+         }
+         ##
+         devices {
+         device {
+         vendor "SolidFir"
+         product "SSD SAN"
+         path_grouping_policy multibus
+         path_selector "round-robin 0"
+         path_checker tur hardware_handler "0"
+         failback immediate
+         rr_weight uniform
+         rr_min_io 10
+         rr_min_io_rq 10
+         features "0"
+         no_path_retry 24
+         prio const
+         }
+         }
+         ## Device black list
+         ## Enter devices you do NOT want to be controlled by multipathd
+         ## Example: internal drives
+         
+         #blacklist {
+         
+         #}
+ 
+   - name: Modify the Iscsi configuration file 
+     delegate_to: "{{ dbservername }}"
+     become: yes
+     lineinfile:
+       path: /etc/iscsi/iscsid.conf
+       line: "{{ item }}"
+       create: yes
+     loop:
+       - "node.startup = automatic"
+       - "node.leading_login = Yes"
+       - "node.session.nr_sessions = 2"
+       - "node.session.auth.authmethod = CHAP"
+       - "node.session.auth.username = {{ dbservername }}"
+       - "node.session.auth.password = ThIsIs$eCrEt"
+       - "discovery.sendtargets.auth.authmethod = CHAP"
+       - "discovery.sendtargets.auth.username = {{dbservername }}"
+       - "discovery.sendtargets.auth.password = ThIsIs$eCrEt"
+
+   - name: Reboot host and wait
+     delegate_to: "{{ dbservername }}"
+     become: yes
+     reboot: 
+       reboot_timeout: 3600   
+
+   - name: Discover Targets
+     delegate_to: "{{ dbservername }}"
+     become: yes
+     open_iscsi:
+       show_nodes: yes
+       discover: yes
+       portal: "{{ sf_svip }}"
+     register: TargetsResults
+
+   - name: debug
+     debug: 
+       msg={{ item }}
+     with_items: "{{ TargetsResults.nodes }}"
+
+   - name: Discover Targets
+     delegate_to: "{{ dbservername }}"
+     become: yes
+     open_iscsi:
+       login: yes
+       discover: yes
+       portal: "{{ sf_svip }}"
+       target: "{{ item }}"
+     with_items: "{{ TargetsResults.nodes }}"
+
+   - name: Create data volume group
+     delegate_to: "{{ dbservername }}"
+     become: yes
+     lvg:
+       vg: "{{ item.name }}"
+       pvs: "{{ item.devices }}"
+     loop:
+       - { name: "pgdata01", devices: "/dev/dm-2,/dev/dm-3,/dev/dm-4,/dev/dm-5,/dev/dm-6,/dev/dm-7,/dev/dm-8,/dev/dm-9"}
+       - { name: "pglog01", devices: "/dev/dm-10"}
+       - { name: "pgbin01", devices: "/dev/dm-11"}
+
+   - name: create Logical volume 
+     delegate_to: "{{ dbservername }}"
+     become: yes 
+     lvol:
+       vg: "{{ item.name }}"
+       lv: "{{ item.name }}"
+       size: 100%PVS
+     loop:
+       - { name: "pgdata01", devices: "/dev/dm-2,/dev/dm-3,/dev/dm-4,/dev/dm-5,/dev/dm-6,/dev/dm-7,/dev/dm-8,/dev/dm-9"}
+       - { name: "pglog01", devices: "/dev/dm-10"}
+       - { name: "pgbin01", devices: "/dev/dm-11"}
+
+ 
+   
+   - name: create File System 
+     delegate_to: "{{ dbservername }}"
+     become: yes
+     filesystem:
+       fstype: ext4
+       dev: "/dev/mapper/{{ item.name }}-{{ item.name }}"
+     loop:
+       - { name: "pgdata01", devices: "/dev/dm-2,/dev/dm-3,/dev/dm-4,/dev/dm-5,/dev/dm-6,/dev/dm-7,/dev/dm-8,/dev/dm-9"}
+       - { name: "pglog01", devices: "/dev/dm-10"}
+       - { name: "pgbin01", devices: "/dev/dm-11"}
+
+ 
+
+   - name: create Directory path 
+     delegate_to: "{{ dbservername }}"
+     become: yes
+     file:
+       path: "/mnt/{{ item.name }}"
+       state: directory
+     loop:
+       - { name: "pgdata01", devices: "/dev/dm-2,/dev/dm-3,/dev/dm-4,/dev/dm-5,/dev/dm-6,/dev/dm-7,/dev/dm-8,/dev/dm-9"}
+       - { name: "pglog01", devices: "/dev/dm-10"}
+       - { name: "pgbin01", devices: "/dev/dm-11"}
+
+
+   - name: create Mount FS 
+     delegate_to: "{{ dbservername }}"
+     become: yes 
+     mount:
+       path: "/mnt/{{ item.name }}"
+       state: mounted
+       src: "/dev/mapper/{{ item.name }}-{{ item.name }}"
+       opts:  noatime,discard,nobarrier
+       fstype: ext4
+     loop:
+       - { name: "pgdata01", devices: "/dev/dm-2,/dev/dm-3,/dev/dm-4,/dev/dm-5,/dev/dm-6,/dev/dm-7,/dev/dm-8,/dev/dm-9"}
+       - { name: "pglog01", devices: "/dev/dm-10"}
+       - { name: "pgbin01", devices: "/dev/dm-11"}

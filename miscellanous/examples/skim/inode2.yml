@@ -1,0 +1,53 @@
+---
+- hosts: localhost
+  name: Increase Inodes
+  gather_facts: false
+  tasks:
+    - name: Get number of inodes to increase by
+      na_ontap_command:
+        hostname: "17.129.132.100"
+        username: "skim"
+        password: "spgantap01"
+        https: true
+        validate_certs: false
+        command: ["volume","show","-volume","sktest","-fields","files"]
+      changed_when: false
+      register: vol_show_output
+    - debug:
+        var: vol_show_output
+    - debug:
+        var: (vol_show_output.msg.splitlines()[2].split(' ')[2] | int * 1.1) | int
+    - name: increase inodes
+      na_ontap_command:
+        hostname: "17.129.132.100"
+        username: "skim"
+        password: "spgantap01"
+        https: true
+        validate_certs: false
+        command: ["volume","modify","-vserver","scv_uat01","-volume","sktest","-files","{{ (vol_show_output.msg.splitlines()[2].split(' ')[2] | int * 1.1) | int }}"]
+
+
+
+
+[root@localhost ansibletest]# ansible-playbook inodes2.yml -v
+No config file found; using defaults
+ [WARNING]: Unable to parse /etc/ansible/hosts as an inventory source
+
+ [WARNING]: No inventory was parsed, only implicit localhost is available
+
+ [WARNING]: provided hosts list is empty, only localhost is available. Note that the implicit localhost does not match 'all'
+
+
+PLAY [Increase Inodes] ******************************************************************************************************
+
+TASK [Get number of inodes to increase by] **********************************************************************************
+ok: [localhost] => {"changed": false, "msg": "<results xmlns=\"http://www.netapp.com/filer/admin\" status=\"passed\"><cli-output>vserver   volume files  \n--------- ------ ------ \nscv_uat01 sktest 466937 \n\n</cli-output><cli-result-value>1</cli-result-value></results>"}
+
+TASK [increase inodes] ******************************************************************************************************
+changed: [localhost] => {"changed": true, "msg": "<results xmlns=\"http://www.netapp.com/filer/admin\" status=\"passed\"><cli-output>Error: Missing value for -files. </cli-output><cli-result-value>0</cli-result-value></results>"}
+
+PLAY RECAP ******************************************************************************************************************
+localhost                  : ok=2    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+[root@localhost ansibletest]#
+[root@localhost ansibletest]# ls
