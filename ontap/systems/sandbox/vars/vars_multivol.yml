@@ -19,7 +19,7 @@ netapp_https: true
 netapp_validate_certs: false           # Set the default
 
 # SVM configuration
-svm: ontap-vs01
+vserver: ontap-vs01
 
 ###
 # Module-Based:  Volume Configuration varibles
@@ -28,6 +28,7 @@ svm: ontap-vs01
 # Volume Configuration Templates
 
 vol_type:
+
   scratch:
     :max_size: 15TB
     :size: 8TB
