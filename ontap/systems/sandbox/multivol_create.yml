@@ -24,13 +24,8 @@
       validate_certs:   "{{ netapp_validate_certs }}"
     state:              present
 
-    # aggrs: "{{ lookup('file','aggrs.json') | from_json }}"
-    # nodes: "{{ lookup('file','nodes.json') | from_json }}"
-    #
-    # # Other Variables that have to be declared but have no default
-    # vserver:
-    # aggr_list: []
-    # node_list: []
+    aggr: "{{ cluster }}_01_aggr1"
+    vserver: ontap-vs01
 
   vars_files:
     vars/vars_multivol.yml
@@ -54,143 +49,40 @@
 
 
   tasks:
-#   - name:                       Collect information about Nodes and Aggregates
-#     na_ontap_info:
-#       gather_subset:            aggregate_info,cluster_node_info,vserver_info
-#       <<: *login
-#     register:                   netapp_info
-#
-#   - name:                       Set cluster name
-#     set_fact:
-#       cluster:                  "{{ item }}"
-#     with_items:                 "{{ netapp_info.ontap_info.vserver_info}}"
-#     when:                       netapp_info.ontap_info.vserver_info[item].comment == 'The administrative vserver.'
-#
-#   - name:                       Set vserver root vol name
-#     set_fact:
-#       root_vol:                 "{{ netapp_info.ontap_info.vserver_info[item].root_volume }}"
-#     with_items:                 "{{ netapp_info.ontap_info.vserver_info}}"
-#     when:                       item == vserver
-#
-#   - name:                       Create Node list
-#     set_fact:
-#       node_list:                "{{ node_list }} + ['{{ netapp_info.ontap_info.cluster_node_info[item].node_name }}']"
-#     with_items:                 "{{ netapp_info.ontap_info.cluster_node_info }}"
-#
-#   - block:
-#     - name:                     Create Aggregate list
-#       set_fact:
-#         aggr_list:              "{{
-#                                     aggr_list |
-#                                         default({}) |
-#                                             combine({ item.0: (aggr_list[item.0] if aggr_list[item.0] is defined else {}) |
-#                                                  combine ({ item.1: netapp_info.ontap_info.aggregate_info[item.1].aggr_space_attributes.size_available }) })
-#                                  }}"
-#       loop:                      "{{ node_list | product(netapp_info.ontap_info.aggregate_info) | list }}"
-#       when:
-#         -                         netapp_info.ontap_info.aggregate_info[item.1].aggr_ownership_attributes.home_name == item.0
-#         -                         netapp_info.ontap_info.aggregate_info[item.1].aggr_raid_attributes.is_root_aggregate != 'true'
-#
-# # Raw Aggrs
-#   - debug:
-#       msg:
-#         -           "{{ aggr_list }}"
-#
-#
-# # Biggest Aggrs
-#   - set_fact:
-#       biggest_aggr_list:      "{{ biggest_aggr_list | default([]) + [{ 'aggr':(item.value | list | sort | first) }] }}"
-#     with_dict:           "{{ aggr_list }}"
-#
-#
-#   - debug:
-#       msg:
-#         -           "{{ biggest_aggr_list  }}"
 
-  # - name: ..... create destination LS Volume
-  #   na_ontap_volume:
-  #     hostname: "{{ netapp_hostname }}"
-  #     username: "{{ netapp_username }}"
-  #     password: "{{ netapp_password }}"
-  #     https: true
-  #     validate_certs: false
-  #     state: present
-  #     name: "{{ vserver }}_ls_{{ count }}"
-  #     aggregate_name: "{{ item.aggr }}"
-  #     size: 1
-  #     size_unit: gb
-  #     vserver: "{{ vserver }}"
-  #   with_items:
-  #     "{{ voltype }}"
-  #   loop_control:
-  #     index_var: count
-  #   tags: create
+  # Simple With sequence
+  - name: Based on a count of volumes
+    na_ontap_volume:
+      <<: *login
+      state: "{{ state }}"
 
-  # - name: with_sequence
-  #   ansible.builtin.debug:
-  #     msg: "{{ item }}"
-  #   with_sequence: start=0 end=4 stride=2 format=testuser%02x
-  # - name: with_sequence -> loop
-  #   ansible.builtin.debug:
-  #     msg: "{{ 'testuser%02x' | format(item) }}"
-  #   # range is exclusive of the end point
-  #   loop: "{{ range(0, 4 + 1, 2)|list }}"
+      name: "{{ vol_type.[ type ] }}_{{ count }}"
 
-  # Ansible Docs Examples
-  # - name: Create some test users
-  #   user:
-  #     name: "{{ item }}"
-  #     state: "{{ state }}"
-  #     groups: "evens"
-  #   with_sequence: start=0 end=32 format=testuser%02x
+      size: "{{ vol_type.[type].size }}"
+      size_unit: "{{ vol_type.[type].size_unit | default('TB') }}"
 
-  # - name: Display some test users
-  #   debug:
-  #     msg: "User: {{ item }}"
-  #   with_sequence: start=0 end=32 format=testuser%02x
-  #
-  # - name: Create a series of directories with even numbers for some reason
-  #   file:
-  #     dest: "/tmp/multidirs/{{ item }}"
-  #     state: directory
-  #   with_sequence: start=4 end=16 stride=2
-  #
-  # # - name: A simpler way to use the sequence plugin create 4 groups
-  # #   group:
-  # #     name: "group{{ item }}"
-  # #     state: "{{ state }}"
-  # #   with_sequence: count=4
-  #
-  # - name: Display some groups
-  #   debug:
-  #     msg: "Group: group{{ item }}"
-  #   with_sequence: count=4
-  #
-  # - name: the final countdown
-  #   debug: msg="{{ item }} seconds to detonation"
-  #   with_sequence: end=0 start=10 stride=-1
-  #
-  # - name: Use of varible
-  #   debug:
-  #     msg: "Count: {{ item }}"
-  #   with_sequence: start=1 end="{{ end_at }}"
-  #   vars:
-  #     - end_at: 10
-  #
-  # # Begin volume name Dry-Run
-  # - name: Begin Volume name dev
-  #   ansible.builtin.debug:
-  #     msg: "Begin Volume name testin"
+      aggregate_name: "{{ aggr }}"
+      vserver: "{{ vserver }}"
 
-  # # RAW volumes Dry-Run - with_sequence
-  # - name: with_sequence
-  #   ansible.builtin.debug:
-  #     msg: "{{ item }}"
-  #   with_sequence: start=1 end="{{ volcount }}" stride=1 format=scratch%03d
+      # comment: '{{ opt_volume_comment_01  | default(omit)  }}'
 
-    # RAW volumes Dry-Run - loop
-  - name: with_sequence -> loop
-    ansible.builtin.debug:
-      msg: "{{ '{{ voltype }}%03d' | format(item) }}"
-    # range is exclusive of the end point
-    loop: "{{ range(0, [ volcount | list ] + 1, 1)|list }}"
+      export_policy: '{{ vol_type.[type].[export_policy]  | default(omit)  }}'
+
+      junction_path: '/{{ vol_type.[type]_[count]  | default(omit)  }}'
+
+      percent_snapshot_space: '{{ vol_type.[type].[snap_precent]  | default(0)  }}'
+
+      # qos_adaptive_policy_group: '{{ opt_volume_qos_adaptive_policy_group_01  | default(omit)  }}'
+      qos_policy_group: '{{ vol_type.[type].[qos_policy]  | default(omit)  }}'
+
+      snapshot_policy: '{{ vol_type.[type].[snap_policy]  | default(omit)  }}'
+
+      # space_guarantee: '{{ opt_volume_space_guarantee_01  | default(none)  }}'
+
+    with_sequence: count=100
+    # loop:
+    #   "{{  }}"
+    loop_control:
+      index_var: count
+    register: results
+    tags: create
