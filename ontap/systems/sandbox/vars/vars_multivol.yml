@@ -25,9 +25,9 @@ netapp_validate_certs: false           # Set the default
 # Volume Configuration Templates
 
 scratch:
-  max_size: '15'
-  size: '8'
-  size_unit: TB
+  max_size: 15
+  size: 8
+  size_unit: gb
   snap_policy: csg_scratch
   qos_policy: csg_scratch
   snap_percent: 5

@@ -75,8 +75,10 @@
 
       name: "{{ type }}_{{ count }}"
 
-      size: "{{ type }}.size"
-      size_unit: "{{ type }}.size_unit"
+      # size: "{{ [type].size |int }}"
+      # size_unit: "{{ type }}.size_unit"
+      size: "{{ scratch.size | int }}"
+      size_unit: "{{ scratch.size_unit}}"
 
       # comment: '{{ opt_volume_comment_01  | default(omit)  }}'
 
