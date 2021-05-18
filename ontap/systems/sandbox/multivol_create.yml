@@ -56,30 +56,31 @@
       <<: *login
       state: "{{ state }}"
 
-      name: "{{ vol_type.[ type ] }}_{{ count }}"
-
-      size: "{{ vol_type.[type].size }}"
-      size_unit: "{{ vol_type.[type].size_unit | default('TB') }}"
-
       aggregate_name: "{{ aggr }}"
       vserver: "{{ vserver }}"
 
+      # junction_path: '/{{ vol_type.[type]_[count]  | default(omit)  }}'
+      #
+      # name: "{{ vol_type.[ type ] }}_{{ count }}"
+      #
+      # size: "{{ vol_type.[type].size }}"
+      # size_unit: "{{ vol_type.[type].size_unit | default('TB') }}"
+      #
+      # percent_snapshot_space: '{{ vol_type.[type].[snap_precent]  | default(0)  }}'
+      # qos_policy_group: '{{ vol_type.[type].[qos_policy]  | default(omit)  }}'
+      # snapshot_policy: '{{ vol_type.[type].[snap_policy]  | default(omit)  }}'
+      # export_policy: '{{ vol_type.[type].export_policy  | default(omit)  }}'
+
+      # junction_path: '/{{ type }}_{{ count }}  | default(omit)  }}'
+
+      name: "{{ type }}_{{ count }}"
+
+      size: "{{ type }}.size"
+      size_unit: "{{ type }}.size_unit"
+
       # comment: '{{ opt_volume_comment_01  | default(omit)  }}'
 
-      export_policy: '{{ vol_type.[type].[export_policy]  | default(omit)  }}'
-
-      junction_path: '/{{ vol_type.[type]_[count]  | default(omit)  }}'
-
-      percent_snapshot_space: '{{ vol_type.[type].[snap_precent]  | default(0)  }}'
-
-      # qos_adaptive_policy_group: '{{ opt_volume_qos_adaptive_policy_group_01  | default(omit)  }}'
-      qos_policy_group: '{{ vol_type.[type].[qos_policy]  | default(omit)  }}'
-
-      snapshot_policy: '{{ vol_type.[type].[snap_policy]  | default(omit)  }}'
-
-      # space_guarantee: '{{ opt_volume_space_guarantee_01  | default(none)  }}'
-
-    with_sequence: count=100
+    with_sequence: count=4
     # loop:
     #   "{{  }}"
     loop_control:

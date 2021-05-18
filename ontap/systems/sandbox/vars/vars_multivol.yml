@@ -24,6 +24,15 @@ netapp_validate_certs: false           # Set the default
 
 # Volume Configuration Templates
 
+scratch:
+  max_size: '15'
+  size: '8'
+  size_unit: TB
+  snap_policy: csg_scratch
+  qos_policy: csg_scratch
+  snap_percent: 5
+  export_policy: CSG_Default_0001
+
 vol_type:
 
   scratch:
@@ -76,12 +85,12 @@ vol_type:
     export_policy: CSG_Database_0001
 
   vcs:
-    :max_size: 0
-    :size: 8TB
-    :snap_policy: none
-    :qos_policy: csg_safe
-    :snap_percent: 0
-    :export_policy: CSG_Default_0001
+    max_size: 0
+    size: 8TB
+    snap_policy: none
+    qos_policy: csg_safe
+    snap_percent: 0
+    export_policy: CSG_Default_0001
 
 # vol_type:
 #
