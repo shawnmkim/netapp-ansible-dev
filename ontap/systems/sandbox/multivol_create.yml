@@ -82,7 +82,7 @@
 
       # comment: '{{ opt_volume_comment_01  | default(omit)  }}'
 
-    with_sequence: count=4
+    with_sequence: count='{{ number }}'
     # loop:
     #   "{{  }}"
     loop_control:
