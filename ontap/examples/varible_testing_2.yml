@@ -1,0 +1,62 @@
+- hosts: localhost
+  gather_facts: false
+  vars:
+    v1: [1,2,3,4]
+    v2: 2
+    type: scratch
+    vol_templates:
+      scratch:
+        max_autosize: 18
+        size: 8
+        size_unit: TB
+        snap_policy: csg_scratch
+        qos_policy: csg_scratch
+        snap_percent: 5
+        export_policy: CSG_Default_0001
+
+    app_env: staging
+
+    app_environments:
+      staging:
+        app_a:
+          db_host: localhost
+        app_b:
+          db_host: localhost
+      production:
+        app_a:
+          db_host: app_a-db.example.net
+        app_b:
+          db_host: app_b-db.example.com
+
+  tasks:
+
+  - debug: msg="{{ v1[v2] }}"
+
+  - debug: var={{app_env}}.app_a.db_host
+    vars:
+      app_env: staging
+
+      staging:
+        app_a:
+          db_host: localhost
+        app_b:
+          db_host: localhost
+      production:
+        app_a:
+          db_host: app_a-db.example.net
+        app_b:
+          db_host: app_b-db.example.com
+
+  - debug: msg="{{app_environments[app_env].app_a.db_host}}"
+
+  - debug: msg="{{app_environments[app_env]['app_a']['db_host']}}"
+
+  - name: ONTAP nested varible - max_autosize
+    debug:
+      msg: "{{vol_templates[type]['max_autosize']}}"
+
+  - name: ONTAP nested varibles
+    debug:
+      # msg: "{{ var }}"
+
+    with_dict: "{{ vol_templates[type] }}"

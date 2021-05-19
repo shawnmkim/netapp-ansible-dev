@@ -1,0 +1,74 @@
+- hosts: localhost
+  vars:
+    v1: [1,2,3,4]
+    v2: 2
+    type: scratch
+    scratch:
+      max_autosize: 18
+
+    app_env: staging
+
+    app_environments:
+      staging:
+        app_a:
+          db_host: localhost
+        app_b:
+          db_host: localhost
+      production:
+        app_a:
+          db_host: app_a-db.example.net
+        app_b:
+          db_host: app_b-db.example.com
+
+  tasks:
+
+  - debug: msg="{{ v1[v2] }}"
+
+# TASK [debug] ********************************************************************
+# ok: [localhost] => {
+#     "msg": "3"
+# }
+
+  - debug: msg="{{ v1[v2 | int ] }}"  # faster than omitting the '| int'
+
+# TASK [debug] ********************************************************************
+# ok: [localhost] => {
+#     "msg": "3"
+# }
+
+  - debug: msg="{{ voltype }}"
+    vars:
+        voltype: '{{ type }}.max_autosize'
+        scratch:
+          max_autosize: 18
+
+
+# Example using task vars
+# - hosts: test.org
+#   tasks:
+#     - debug:
+#         var: "{{ tmp_mac }}"
+#       vars:
+#         tmp_mac: ansible_{{net1}}.macaddress
+#     - debug:
+#         var: "hostvars[inventory_hostname]['ansible_' + net1]['macaddress']"
+
+
+  - debug: var={{app_env}}.app_a.db_host
+      # msg: "{{ var }}"
+    vars:
+      app_env: staging
+
+      staging:
+        app_a:
+          db_host: localhost
+        app_b:
+          db_host: localhost
+      production:
+        app_a:
+          db_host: app_a-db.example.net
+        app_b:
+          db_host: app_b-db.example.com
+
+  - debug: msg="{{app_environments[app_env].app_a.db_host}}"
+  - debug: msg="{{app_environments[app_env]['app_a']['db_host']}}"

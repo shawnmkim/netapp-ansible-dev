@@ -1,7 +1,7 @@
 ################################################################################
 #
 #   Author      :   Ken Hillier
-#   Date        :   14 May 2021
+#   Date        :   18 May 2021
 #
 #   Description :   Workflow to create multiple volumes based on a template
 #
@@ -71,20 +71,45 @@
       # snapshot_policy: '{{ vol_type.[type].[snap_policy]  | default(omit)  }}'
       # export_policy: '{{ vol_type.[type].export_policy  | default(omit)  }}'
 
-      # junction_path: '/{{ type }}_{{ count }}  | default(omit)  }}'
-
       name: "{{ type }}_{{ count }}"
 
       # size: "{{ [type].size |int }}"
       # size_unit: "{{ type }}.size_unit"
       size: "{{ scratch.size | int }}"
-      size_unit: "{{ scratch.size_unit}}"
+      size_unit: "{{ scratch.size_unit | default('tb')}}"
 
       # comment: '{{ opt_volume_comment_01  | default(omit)  }}'
 
     with_sequence: count='{{ number }}'
     # loop:
     #   "{{  }}"
+    loop_control:
+      index_var: count
+    register: results
+    tags: create
+
+  - name: Modify volume autosize
+    na_ontap_volume_autosize:
+      <<: *login
+      state: "{{ state }}"
+
+      vserver: "{{ vserver }}"
+
+      # volume: ansibleVolumesize12
+      # mode: grow
+      # grow_threshold_percent: 99
+      # increment_size: 50m
+      maximum_size: "{{ item.max_size }}"
+      # minimum_size: 21m
+      # shrink_threshold_percent: 40
+
+      volume: "{{ type }}_{{ count }}"
+
+    # with_items: "{{ type }}"
+    # with_sequence: count='{{ number }}'
+    # with_sequence: count='5'
+    loop:
+      "{{ type | list }}"
     loop_control:
       index_var: count
     register: results
