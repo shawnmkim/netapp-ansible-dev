@@ -87,7 +87,7 @@
     loop: "{{ snap_policies }}"
 
   # Creating multiple volumes
-  - name: 'Create {{ number }} {{ type }} volumes based on the template'
+  - name: 'Create {{ number }} {{ type }} volumes based on the  {{ type }} template'
     na_ontap_volume:
       <<: *login
       state: "{{ state }}"
@@ -117,7 +117,7 @@
   - name: Modify volume autosize
     na_ontap_volume_autosize:
       <<: *login
-      state: "{{ state }}"
+      # state: "{{ state }}"
 
       vserver: "{{ vserver }}"
 
@@ -125,7 +125,7 @@
       # mode: grow
       # grow_threshold_percent: 99
       # increment_size: 50m
-      maximum_size:  "{{ vol_templates[type]['max_autosize'] }}"
+      maximum_size:  "{{ vol_templates[type]['max_autosize'] | default(omit) }}"
       # minimum_size: 21m
       # shrink_threshold_percent: 40
 

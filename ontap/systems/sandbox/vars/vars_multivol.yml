@@ -19,13 +19,14 @@ netapp_https: true
 netapp_validate_certs: false           # Set the default
 
 ###
-#
+# Varibles to setup policies
 ###
 
 qos_policies:
   # - { name: csg_scratch, vserver: ontap-vs01, max: '800KB/s,800iops', min: '100iops' }
   # - { name: csg_safe, vserver: ontap-vs01, max: '80KB/s,80iops', min: '10iops' }
   # - { name: csg_global, vserver: ontap-vs01, max: '80KB/s,80iops', min: '10iops' }
+  # Removed 'min' because of platform (vsim) limitation
   - { name: csg_scratch, vserver: ontap-vs01, max: '800KB/s,800iops' }
   - { name: csg_safe, vserver: ontap-vs01, max: '80KB/s,80iops' }
   - { name: csg_global, vserver: ontap-vs01, max: '80KB/s,80iops' }
@@ -53,8 +54,6 @@ vol_templates:
     size_unit: gb
     snap_policy: csg_scratch
     qos_policy: csg_scratch
-    # snap_policy: default
-    # qos_policy: default
     snap_percent: 5
     export_policy: CSG_Default_0001
 
