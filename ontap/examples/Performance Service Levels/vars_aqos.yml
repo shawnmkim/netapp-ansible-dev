@@ -1,0 +1,52 @@
+netapp_hostname: 192.168.7.210
+netapp_username: admin
+#netapp_password: Netapp1!
+
+state: present
+svm: ontap-vs01
+
+aqos:
+- { name: bulk, svm: "{{ svm }}", peak_iops_allocation: used_space, absolute_min_iops: 75, expected_iops: 100, peak_iops: 512 }
+- { name: disk_value, svm: "{{ svm }}", absolute_min_iops: 75IOPS, expected_iops: 128IOPS/TB, peak_iops: 250IOPS/TB, peak_iops_allocation: allocated_space }
+- { name: flash_value, svm: "{{ svm }}", absolute_min_iops: 256IOPS, expected_iops: 256IOPS/TB, peak_iops: 512IOPS/TB, peak_iops_allocation: allocated_space }
+
+aqos_std:
+- { name: bulk, svm: "{{ svm }}", peak_iops_allocation: used_space, absolute_min_iops: 75, expected_iops: 100, peak_iops: 512 }
+# - { name: bulk, svm: "{{ svm }}", peak_iops_allocation: used_space,
+#     absolute_min_iops: 75IOPS,
+#     expected_iops: 100IOPS/TB,
+#     peak_iops: 512IOPS/TB }
+- { name: disk_value, svm: "{{ svm }}", peak_iops_allocation: used_space,
+    absolute_min_iops: 75IOPS,
+    expected_iops: 128IOPS/TB,
+    peak_iops: 512IOPS/TB }
+- { name: flash_value, svm: "{{ svm }}", peak_iops_allocation: used_space,
+    absolute_min_iops: 256IOPS,
+    expected_iops: 256IOPS/TB,
+    peak_iops: 512IOPS/TB }
+- { name: performance2, svm: "{{ svm }}", peak_iops_allocation: used_space,
+    absolute_min_iops:   1024,
+    expected_iops:       2048,
+    peak_iops:           4096 }
+- { name: extreme2, svm: "{{ svm }}", peak_iops_allocation: used_space,
+    absolute_min_iops:   3072,
+    expected_iops:       6144,
+    peak_iops:           12288 }
+- { name: ultra, svm: "{{ svm }}", peak_iops_allocation: allocated_space,
+    absolute_min_iops:   8000,
+    expected_iops:       18432,
+    peak_iops:           36864 }
+
+aqos_db:
+- { name: db_data, svm: "{{ svm }}", peak_iops_allocation: allocated_space,
+    absolute_min_iops:   8000,
+    expected_iops:       12288,
+    peak_iops:           12288 }
+- { name: db_shared, svm: "{{ svm }}", peak_iops_allocation: allocated_space,
+    absolute_min_iops:   8000,
+    expected_iops:       16384,
+    peak_iops:           16384 }
+- { name: db_log, svm: "{{ svm }}", peak_iops_allocation: allocated_space,
+    absolute_min_iops:   8000,
+    expected_iops:       22528,
+    peak_iops:           22528 }

@@ -1,0 +1,45 @@
+---
+- hosts: localhost
+  gather_facts: false
+  name: 'Manage ONTAP Adaptive QOS Policies'
+  collections:
+    - netapp.ontap
+
+  vars:
+    login: &login
+      hostname: "{{ netapp_hostname }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: false
+  vars_prompt:
+    - name: "netapp_password"
+      prompt: "Enter the NetApp Admin password"
+  vars_files:
+  - vars_aqos.yml
+
+  tasks:
+
+  - name: 'Apply Database Performance Service Levels'
+    na_ontap_qos_adaptive_policy_group:
+      state: "{{ state }}"
+      name: "{{ item.name }}"
+      vserver: "{{ item.svm }}"
+      absolute_min_iops: "{{ item.absolute_min_iops }}"
+      expected_iops: "{{ item.expected_iops }}"
+      peak_iops: "{{ item.peak_iops }}"
+      peak_iops_allocation: "{{ item.peak_iops_allocation | default(allocated_space) }}"
+      <<: *login
+    loop: "{{ aqos_std }}"
+
+  - name: 'Apply Standard Performance Service Levels'
+    na_ontap_qos_adaptive_policy_group:
+      state: "{{ state }}"
+      name: "{{ item.name }}"
+      vserver: "{{ item.svm }}"
+      absolute_min_iops: "{{ item.absolute_min_iops }}"
+      expected_iops: "{{ item.expected_iops }}"
+      peak_iops: "{{ item.peak_iops }}"
+      peak_iops_allocation: "{{ item.peak_iops_allocation | default(allocated_space) }}"
+      <<: *login
+    loop: "{{ aqos_db }}"
