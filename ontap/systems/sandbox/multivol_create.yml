@@ -1,7 +1,7 @@
 ################################################################################
 #
 #   Author      :   Ken Hillier
-#   Date        :   18 May 2021
+#   Date        :   19 May 2021
 #
 #   Description :   Workflow to create multiple volumes based on a template
 #
@@ -50,8 +50,44 @@
 
   tasks:
 
-  # Simple With sequence
-  - name: Based on a count of volumes
+  # Creating policy dependancies for the volume creation process
+  - name: create qos policy group
+    na_ontap_qos_policy_group:
+      <<: *login
+      state: "{{ state }}"
+
+      name: "{{ item.name }}"
+      vserver: "{{ item.vserver }}"
+      max_throughput: "{{ item.max | default(omit) }}"
+      min_throughput: "{{ item.min | default(omit) }}"
+
+    loop: "{{ qos_policies }}"
+
+  - name: Create Export Policy
+    na_ontap_export_policy:
+      <<: *login
+      state: "{{ state }}"
+
+      name: "{{ item.name }}"
+      vserver: "{{ item.vserver }}"
+
+    loop: "{{ export_policies }}"
+
+  - name: Create Snapshot policy
+    na_ontap_snapshot_policy:
+      <<: *login
+      state: "{{ state }}"
+
+      name: "{{ item.name }}"
+      schedule: "{{ item.sched }}"
+      prefix: "{{ item.prefix | default(omit) }}"
+      count: "{{ item.count }}"
+      enabled: "{{ item.enabled }}"
+
+    loop: "{{ snap_policies }}"
+
+  # Creating multiple volumes
+  - name: 'Create {{ number }} {{ type }} volumes based on the template'
     na_ontap_volume:
       <<: *login
       state: "{{ state }}"
@@ -59,35 +95,25 @@
       aggregate_name: "{{ aggr }}"
       vserver: "{{ vserver }}"
 
-      # junction_path: '/{{ vol_type.[type]_[count]  | default(omit)  }}'
-      #
-      # name: "{{ vol_type.[ type ] }}_{{ count }}"
-      #
-      # size: "{{ vol_type.[type].size }}"
-      # size_unit: "{{ vol_type.[type].size_unit | default('TB') }}"
-      #
-      # percent_snapshot_space: '{{ vol_type.[type].[snap_precent]  | default(0)  }}'
-      # qos_policy_group: '{{ vol_type.[type].[qos_policy]  | default(omit)  }}'
-      # snapshot_policy: '{{ vol_type.[type].[snap_policy]  | default(omit)  }}'
-      # export_policy: '{{ vol_type.[type].export_policy  | default(omit)  }}'
+      name:       "{{ type }}_{{ count }}"
+      size:       "{{ vol_templates[type]['size'] | int }}"
+      size_unit:  "{{ vol_templates[type]['size_unit'] | default('tb') }}"
 
-      name: "{{ type }}_{{ count }}"
-
-      # size: "{{ [type].size |int }}"
-      # size_unit: "{{ type }}.size_unit"
-      size: "{{ scratch.size | int }}"
-      size_unit: "{{ scratch.size_unit | default('tb')}}"
+      percent_snapshot_space: "{{ vol_templates[type]['snap_precent'] | default(0)  }}"
+      qos_policy_group: "{{ vol_templates[type]['qos_policy'] | default(omit)  }}"
+      snapshot_policy: "{{ vol_templates[type]['snap_policy'] | default(omit)  }}"
+      export_policy: "{{ vol_templates[type]['export_policy'] | default(omit)  }}"
 
       # comment: '{{ opt_volume_comment_01  | default(omit)  }}'
 
     with_sequence: count='{{ number }}'
-    # loop:
-    #   "{{  }}"
+
     loop_control:
       index_var: count
     register: results
     tags: create
 
+  # Adjust "MAX" autosize
   - name: Modify volume autosize
     na_ontap_volume_autosize:
       <<: *login
@@ -99,17 +125,15 @@
       # mode: grow
       # grow_threshold_percent: 99
       # increment_size: 50m
-      maximum_size: "{{ item.max_size }}"
+      maximum_size:  "{{ vol_templates[type]['max_autosize'] }}"
       # minimum_size: 21m
       # shrink_threshold_percent: 40
 
       volume: "{{ type }}_{{ count }}"
 
     # with_items: "{{ type }}"
-    # with_sequence: count='{{ number }}'
+    with_sequence: count='{{ number | int }}'
     # with_sequence: count='5'
-    loop:
-      "{{ type | list }}"
     loop_control:
       index_var: count
     register: results

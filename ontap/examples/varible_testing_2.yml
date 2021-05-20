@@ -1,8 +1,6 @@
 - hosts: localhost
   gather_facts: false
   vars:
-    v1: [1,2,3,4]
-    v2: 2
     type: scratch
     vol_templates:
       scratch:
@@ -30,23 +28,6 @@
 
   tasks:
 
-  - debug: msg="{{ v1[v2] }}"
-
-  - debug: var={{app_env}}.app_a.db_host
-    vars:
-      app_env: staging
-
-      staging:
-        app_a:
-          db_host: localhost
-        app_b:
-          db_host: localhost
-      production:
-        app_a:
-          db_host: app_a-db.example.net
-        app_b:
-          db_host: app_b-db.example.com
-
   - debug: msg="{{app_environments[app_env].app_a.db_host}}"
 
   - debug: msg="{{app_environments[app_env]['app_a']['db_host']}}"
@@ -57,6 +38,4 @@
 
   - name: ONTAP nested varibles
     debug:
-      # msg: "{{ var }}"
-
     with_dict: "{{ vol_templates[type] }}"

@@ -19,66 +19,85 @@ netapp_https: true
 netapp_validate_certs: false           # Set the default
 
 ###
+#
+###
+
+qos_policies:
+  # - { name: csg_scratch, vserver: ontap-vs01, max: '800KB/s,800iops', min: '100iops' }
+  # - { name: csg_safe, vserver: ontap-vs01, max: '80KB/s,80iops', min: '10iops' }
+  # - { name: csg_global, vserver: ontap-vs01, max: '80KB/s,80iops', min: '10iops' }
+  - { name: csg_scratch, vserver: ontap-vs01, max: '800KB/s,800iops' }
+  - { name: csg_safe, vserver: ontap-vs01, max: '80KB/s,80iops' }
+  - { name: csg_global, vserver: ontap-vs01, max: '80KB/s,80iops' }
+
+export_policies:
+  - { name: CSG_Default_0001, vserver: ontap-vs01 }
+  - { name: CSG_Database_0001, vserver: ontap-vs01 }
+
+snap_policies:
+  - { name: csg_scratch, sched: hourly, prefix: , count: 10 , enabled: true }
+  - { name: csg_safe, sched: daily, prefix: , count: 20 , enabled: true }
+  - { name: csg_global, sched: monthly, prefix: csg_global, count: 4, enabled: true }
+
+###
 # Module-Based:  Volume Configuration varibles
 ###
 
 # Volume Configuration Templates
 
-scratch:
-  max_size: 15
-  size: 8
-  size_unit: gb
-  snap_policy: csg_scratch
-  qos_policy: csg_scratch
-  snap_percent: 5
-  export_policy: CSG_Default_0001
-
-vol_type:
+vol_templates:
 
   scratch:
     max_size: 15
     size: 8
-    size_unit: TB
+    size_unit: gb
     snap_policy: csg_scratch
     qos_policy: csg_scratch
+    # snap_policy: default
+    # qos_policy: default
     snap_percent: 5
     export_policy: CSG_Default_0001
 
   scratch_ns:
-    max_size: 15TB
-    size: 8TB
+    max_size: 15
+    size: 8
+    size_unit: gb
     snap_policy: none
     qos_policy: csg_scratch
     snap_percent: 0
     export_policy: CSG_Default_0001
 
   safe:
-    max_size: 15TB
-    size: 8TB
+    max_size: 15
+    size: 8
+    size_unit: gb
     snap_policy: csg_safe
     qos_policy: csg_safe
     snap_percent: 5
     export_policy: CSG_Default_0001
 
   global:
-    max_size: 2TB
-    size: 2TB
+    max_size: 2
+    size: 2
+    size_unit: gb
     snap_policy: csg_global
     qos_policy: csg_global
     snap_percent: 10
     export_policy: CSG_Default_0001
 
   database_ns:
-    max_size: 8TB
-    size: 5TB
+    max_size: 8
+    size: 5
+    size_unit: gb
     snap_policy: none
     qos_policy: csg_safe
     snap_percent: 0
     export_policy: CSG_Default_0001
 
   database_backup:
-    max_size: 8TB
-    size: 5TB
+    max_size: 8
+    size: 5
+    size_unit: gb
     snap_policy: csg_safe
     qos_policy: csg_safe
     snap_percent: 5
@@ -86,67 +105,9 @@ vol_type:
 
   vcs:
     max_size: 0
-    size: 8TB
+    size: 8
+    size_unit: gb
     snap_policy: none
     qos_policy: csg_safe
     snap_percent: 0
     export_policy: CSG_Default_0001
-
-# vol_type:
-#
-#   scratch:
-#     :max_size: 15
-#     :size: 8
-#     :size_unit: TB
-#     :snap_policy: csg_scratch
-#     :qos_policy: csg_scratch
-#     :snap_percent: 5
-#     :export_policy: CSG_Default_0001
-#
-#   scratch_ns:
-#     :max_size: 15TB
-#     :size: 8TB
-#     :snap_policy: none
-#     :qos_policy: csg_scratch
-#     :snap_percent: 0
-#     :export_policy: CSG_Default_0001
-#
-#   safe:
-#     :max_size: 15TB
-#     :size: 8TB
-#     :snap_policy: csg_safe
-#     :qos_policy: csg_safe
-#     :snap_percent: 5
-#     :export_policy: CSG_Default_0001
-#
-#   global:
-#     :max_size: 2TB
-#     :size: 2TB
-#     :snap_policy: csg_global
-#     :qos_policy: csg_global
-#     :snap_percent: 10
-#     :export_policy: CSG_Default_0001
-#
-#   database_ns:
-#     :max_size: 8TB
-#     :size: 5TB
-#     :snap_policy: none
-#     :qos_policy: csg_safe
-#     :snap_percent: 0
-#     :export_policy: CSG_Default_0001
-#
-#   database_backup:
-#     :max_size: 8TB
-#     :size: 5TB
-#     :snap_policy: csg_safe
-#     :qos_policy: csg_safe
-#     :snap_percent: 5
-#     :export_policy: CSG_Database_0001
-#
-#   vcs:
-#     :max_size: 0
-#     :size: 8TB
-#     :snap_policy: none
-#     :qos_policy: csg_safe
-#     :snap_percent: 0
-#     :export_policy: CSG_Default_0001
